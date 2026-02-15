@@ -14,16 +14,293 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      answers: {
+        Row: {
+          attempt_id: string
+          created_at: string
+          id: string
+          is_correct: boolean | null
+          question_id: string
+          selected_option_index: number | null
+          time_spent_seconds: number
+        }
+        Insert: {
+          attempt_id: string
+          created_at?: string
+          id?: string
+          is_correct?: boolean | null
+          question_id: string
+          selected_option_index?: number | null
+          time_spent_seconds?: number
+        }
+        Update: {
+          attempt_id?: string
+          created_at?: string
+          id?: string
+          is_correct?: boolean | null
+          question_id?: string
+          selected_option_index?: number | null
+          time_spent_seconds?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "answers_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: false
+            referencedRelation: "attempts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attempts: {
+        Row: {
+          created_at: string
+          current_section: number
+          exam_type_id: string
+          id: string
+          is_free_attempt: boolean
+          score: number | null
+          section_scores: Json | null
+          started_at: string
+          status: Database["public"]["Enums"]["attempt_status"]
+          submitted_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_section?: number
+          exam_type_id: string
+          id?: string
+          is_free_attempt?: boolean
+          score?: number | null
+          section_scores?: Json | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["attempt_status"]
+          submitted_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_section?: number
+          exam_type_id?: string
+          id?: string
+          is_free_attempt?: boolean
+          score?: number | null
+          section_scores?: Json | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["attempt_status"]
+          submitted_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attempts_exam_type_id_fkey"
+            columns: ["exam_type_id"]
+            isOneToOne: false
+            referencedRelation: "exam_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exam_types: {
+        Row: {
+          created_at: string
+          id: string
+          is_free_tier: boolean
+          name: string
+          scoring_rules: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_free_tier?: boolean
+          name: string
+          scoring_rules: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_free_tier?: boolean
+          name?: string
+          scoring_rules?: Json
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          access_expiry: string | null
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+        }
+        Insert: {
+          access_expiry?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id: string
+        }
+        Update: {
+          access_expiry?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      questions: {
+        Row: {
+          correct_option_index: number
+          created_at: string
+          difficulty: string
+          explanation: string
+          id: string
+          image_url: string | null
+          options: Json
+          question_text: string
+          section: string
+        }
+        Insert: {
+          correct_option_index: number
+          created_at?: string
+          difficulty: string
+          explanation: string
+          id?: string
+          image_url?: string | null
+          options: Json
+          question_text: string
+          section: string
+        }
+        Update: {
+          correct_option_index?: number
+          created_at?: string
+          difficulty?: string
+          explanation?: string
+          id?: string
+          image_url?: string | null
+          options?: Json
+          question_text?: string
+          section?: string
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          access_expiry: string
+          access_start: string
+          amount_cents: number
+          created_at: string
+          currency: string
+          id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          stripe_session_id: string | null
+          user_id: string
+        }
+        Insert: {
+          access_expiry: string
+          access_start?: string
+          amount_cents: number
+          created_at?: string
+          currency?: string
+          id?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_session_id?: string | null
+          user_id: string
+        }
+        Update: {
+          access_expiry?: string
+          access_start?: string
+          amount_cents?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          stripe_session_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      questions_public: {
+        Row: {
+          created_at: string | null
+          difficulty: string | null
+          id: string | null
+          image_url: string | null
+          options: Json | null
+          question_text: string | null
+          section: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          difficulty?: string | null
+          id?: string | null
+          image_url?: string | null
+          options?: Json | null
+          question_text?: string | null
+          section?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          difficulty?: string | null
+          id?: string | null
+          image_url?: string | null
+          options?: Json | null
+          question_text?: string | null
+          section?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      [_ in never]: never
+      has_active_access: { Args: { _user_id: string }; Returns: boolean }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
+      attempt_status: "in_progress" | "completed" | "auto_submitted"
+      subscription_status: "active" | "expired" | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +427,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+      attempt_status: ["in_progress", "completed", "auto_submitted"],
+      subscription_status: ["active", "expired", "cancelled"],
+    },
   },
 } as const
