@@ -1,29 +1,34 @@
 
+# TILprep Brand System Implementation
 
-## Plan: Replace Placeholder Questions with Real Exam Questions
+## Summary
+Apply the complete TILprep brand system: updated color palette, refined typography sizes, and a new 3-tier button system (Primary = outlined, Secondary = green filled, Ghost = text only).
 
-### Current State
-The database contains 42 simple placeholder questions (e.g., "What is sin(30°)?"). These need to be replaced with the 10 real math questions you provided.
+## Changes
 
-### What Will Change
+### 1. `src/index.css` -- Color & Typography Updates
+- Update `--foreground` to Soft Charcoal (#2A2A2A / `0 0% 16.5%`)
+- Update `--warning` to Warm Amber (#F5A623 / `37 91% 55%`)
+- Card foreground, popover foreground, and secondary foreground updated to match new text color
+- Typography sizes already correct (H1 40px/600, H2 28px/500, H3 20px/500, body 16px)
 
-**Step 1 — Clear existing placeholder questions**
-Delete all 42 placeholder rows from the `questions` table (and any related `answers` rows if they exist).
-
-**Step 2 — Insert 10 real math questions**
-Insert your 10 provided questions into the `questions` table with:
-- `section`: "math" for all
-- `question_text`: The actual question text
-- `options`: JSON array of 5 answer choices
-- `correct_option_index`: As specified in your data
-- `explanation`: Full worked-out solution
-- `difficulty`: "medium" (default, adjustable later)
-
-**Note:** After this update, the database will have only 10 math questions instead of 42 across all sections. The simulation currently expects 42 questions (16 math, 10 logic, 10 physics, 6 tech). With only 10 math questions and no questions for other sections, the simulation will need to adapt — it will either run with just the available questions or we can add more questions later for the other sections.
+### 2. `src/components/ui/button.tsx` -- New Button System
+- **default (Primary)**: Transparent background, 1px solid border using primary color (#1E2A38), primary text color, 10px radius, hover lightens background
+- **secondary**: Background #2BB673, white text, hover #249E62, padding 12px 20px
+- **ghost**: Text only, no border (already close, just ensure clean styling)
+- **outline**: Keep as-is for backwards compatibility
 
 ### Technical Details
-- A single SQL migration will handle both the deletion and insertion
-- Foreign key constraints: any existing `answers` referencing old questions will be cleared first
-- The `exam_types` scoring config remains unchanged
-- No code changes needed — the simulation already fetches questions dynamically from the database
 
+**Color HSL conversions:**
+| Color | HEX | HSL |
+|-------|-----|-----|
+| Soft Charcoal (text) | #2A2A2A | 0 0% 16.5% |
+| Warm Amber | #F5A623 | 37 91% 55% |
+| Button green | #2BB673 | 152 61% 44% |
+| Button green hover | #249E62 | 152 61% 38% |
+
+**Button variant mapping:**
+- `default` = Primary CTA (outlined, transparent bg)
+- `secondary` = Secondary CTA (green filled)
+- `ghost` = Cancel/Skip (text only, no border)
