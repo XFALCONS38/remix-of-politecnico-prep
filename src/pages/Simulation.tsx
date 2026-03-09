@@ -47,6 +47,21 @@ const Simulation = () => {
   const [submitting, setSubmitting] = useState(false);
   const questionStartRef = useRef(Date.now());
 
+  // Arrow key navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight" && currentQuestionIdx < questions.length - 1) {
+        setCurrentQuestionIdx((p) => p + 1);
+        questionStartRef.current = Date.now();
+      } else if (e.key === "ArrowLeft" && currentQuestionIdx > 0) {
+        setCurrentQuestionIdx((p) => p - 1);
+        questionStartRef.current = Date.now();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentQuestionIdx, questions.length]);
+
   const currentSection = SECTIONS[currentSectionIdx];
 
   // Initialize attempt
