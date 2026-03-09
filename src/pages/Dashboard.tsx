@@ -13,12 +13,12 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (!user) return;
-    supabase
+    (supabase as any)
       .from("attempts")
       .select("id, started_at, submitted_at, score, status, is_free_attempt")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .then(({ data }) => setAttempts(data ?? []));
+      .then(({ data }: any) => setAttempts(data ?? []));
   }, [user]);
 
   const getStatusBadge = (score: number | null) => {

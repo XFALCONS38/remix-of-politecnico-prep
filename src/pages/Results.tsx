@@ -4,9 +4,22 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Lock, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+interface ReviewQuestion {
+  eaa_id: string;
+  question_id: string;
+  section: string;
+  question_order: number;
+  question_text_en: string;
+  topic: string;
+  passage_text_en: string | null;
+  options: Record<string, string>;
+  assigned_letter: string;
+  student_answer: string | null;
+  solution_en: string | null;
+}
 
 interface AttemptData {
   id: string;
@@ -17,56 +30,36 @@ interface AttemptData {
   is_free_attempt: boolean;
 }
 
-interface AnswerData {
-  id: string;
-  question_id: string;
-  selected_option_index: number | null;
-  is_correct: boolean | null;
-  time_spent_seconds: number;
-  question: {
-    question_text: string;
-    options: string[];
-    correct_option_index: number;
-    explanation: string;
-    section: string;
-  };
-}
-
 const SECTION_LABELS: Record<string, string> = {
-  math: "Mathematics",
+  mathematics: "Mathematics",
   logic: "Comprehension & Logic",
   physics: "Physics",
-  tech: "Technical Knowledge",
+  technical: "Technical Knowledge",
 };
 
 const Results = () => {
   const { attemptId } = useParams<{ attemptId: string }>();
   const { hasActiveAccess } = useAuth();
   const [attempt, setAttempt] = useState<AttemptData | null>(null);
-  const [answers, setAnswers] = useState<AnswerData[]>([]);
+  const [questions, setQuestions] = useState<ReviewQuestion[]>([]);
+  const [hasPaidAccess, setHasPaidAccess] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!attemptId) return;
     const load = async () => {
-      const { data: attemptData } = await supabase
-        .from("attempts")
-        .select("id, score, section_scores, status, submitted_at, is_free_attempt")
-        .eq("id", attemptId)
-        .maybeSingle();
+      const { data, error } = await supabase.functions.invoke("get-exam-review", {
+        body: { attempt_id: attemptId },
+      });
 
-      if (attemptData) setAttempt(attemptData as any);
-
-      const { data: answersData } = await supabase
-        .from("answers")
-        .select("id, question_id, selected_option_index, is_correct, time_spent_seconds")
-        .eq("attempt_id", attemptId);
-
-      if (answersData) {
-        // Fetch question details (uses service-role indirectly — we just show what we have)
-        // For free users, explanations are hidden client-side
-        setAnswers(answersData as any);
+      if (error || data?.error) {
+        setLoading(false);
+        return;
       }
+
+      setAttempt(data.attempt);
+      setQuestions(data.questions);
+      setHasPaidAccess(data.has_paid_access);
       setLoading(false);
     };
     load();
@@ -83,7 +76,17 @@ const Results = () => {
   };
 
   const verdict = getVerdict();
-  const sectionScores = attempt.section_scores as Record<string, any> | null;
+  const sectionScores = attempt.section_scores;
+
+  // Group questions by section
+  const sectionOrder = ["mathematics", "logic", "physics", "technical"];
+  const groupedQuestions = sectionOrder
+    .map((section) => ({
+      section,
+      label: SECTION_LABELS[section],
+      questions: questions.filter((q) => q.section === section),
+    }))
+    .filter((g) => g.questions.length > 0);
 
   return (
     <div className="min-h-screen bg-background">
@@ -113,7 +116,7 @@ const Results = () => {
             <CardHeader><CardTitle>Section Breakdown</CardTitle></CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {Object.entries(sectionScores).map(([section, data]: [string, any]) => (
+                {Object.entries(sectionScores).map(([section, data]) => (
                   <div key={section}>
                     <div className="mb-1 flex items-center justify-between text-sm">
                       <span className="font-medium">{SECTION_LABELS[section] ?? section}</span>
@@ -137,8 +140,8 @@ const Results = () => {
           </Card>
         )}
 
-        {/* Paywall CTA for free users */}
-        {!hasActiveAccess && (
+        {/* Paywall CTA */}
+        {!hasPaidAccess && (
           <Card className="mb-8 border-primary">
             <CardContent className="flex items-center justify-between py-6">
               <div className="flex items-center gap-3">
@@ -153,41 +156,97 @@ const Results = () => {
           </Card>
         )}
 
-        {/* Question Review */}
-        <Card>
-          <CardHeader><CardTitle>Question Review</CardTitle></CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {answers.map((a, i) => (
-                <div key={a.id} className="rounded-lg border p-4">
-                  <div className="flex items-center gap-2">
-                    {a.is_correct === true && <CheckCircle2 className="h-5 w-5 text-success" />}
-                    {a.is_correct === false && <XCircle className="h-5 w-5 text-destructive" />}
-                    {a.is_correct === null && <MinusCircle className="h-5 w-5 text-muted-foreground" />}
-                    <span className="text-sm font-medium">Question {i + 1}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {a.selected_option_index !== null
-                        ? `Selected: ${String.fromCharCode(65 + a.selected_option_index)}`
-                        : "Blank"}
-                    </span>
-                  </div>
+        {/* Question Review by Section */}
+        {groupedQuestions.map((group) => (
+          <Card key={group.section} className="mb-6">
+            <CardHeader>
+              <CardTitle>{group.label}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {group.questions.map((q, i) => {
+                  const isCorrect = q.student_answer === q.assigned_letter;
+                  const isBlank = !q.student_answer;
+                  return (
+                    <div key={q.eaa_id} className="rounded-lg border p-4">
+                      {/* Passage */}
+                      {q.passage_text_en && i === 0 && (
+                        <div className="mb-4 rounded bg-muted/30 p-4">
+                          <p className="mb-1 text-xs font-medium text-muted-foreground uppercase">Reading Passage</p>
+                          <p className="text-sm whitespace-pre-wrap">{q.passage_text_en}</p>
+                        </div>
+                      )}
 
-                  {/* Explanation — blurred for free users */}
-                  {!hasActiveAccess && (
-                    <div className="relative mt-3">
-                      <p className="select-none text-sm blur-sm">
-                        This is the detailed explanation for this question. Upgrade to see the full solution and understand the correct approach.
-                      </p>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <Lock className="h-4 w-4 text-muted-foreground" />
+                      <div className="mb-3 flex items-center gap-2">
+                        {isBlank ? (
+                          <MinusCircle className="h-5 w-5 text-muted-foreground" />
+                        ) : isCorrect ? (
+                          <CheckCircle2 className="h-5 w-5 text-success" />
+                        ) : (
+                          <XCircle className="h-5 w-5 text-destructive" />
+                        )}
+                        <span className="text-sm font-medium">Q{q.question_order}</span>
                       </div>
+
+                      <p className="mb-4 text-sm font-medium">{q.question_text_en}</p>
+
+                      {/* Options with highlighting */}
+                      <div className="space-y-1.5">
+                        {["A", "B", "C", "D", "E"].map((letter) => {
+                          const text = q.options[letter];
+                          if (!text) return null;
+                          const isCorrectOption = letter === q.assigned_letter;
+                          const isStudentPick = letter === q.student_answer;
+                          const isWrongPick = isStudentPick && !isCorrectOption;
+
+                          return (
+                            <div
+                              key={letter}
+                              className={cn(
+                                "flex items-center gap-2 rounded-md px-3 py-2 text-sm",
+                                isCorrectOption && "bg-success/15 text-success font-medium",
+                                isWrongPick && "bg-destructive/15 text-destructive line-through",
+                                !isCorrectOption && !isWrongPick && "text-muted-foreground"
+                              )}
+                            >
+                              <span className={cn(
+                                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium",
+                                isCorrectOption && "border-success bg-success text-success-foreground",
+                                isWrongPick && "border-destructive bg-destructive text-destructive-foreground"
+                              )}>
+                                {letter}
+                              </span>
+                              <span>{text}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Solution */}
+                      {hasPaidAccess && q.solution_en && (
+                        <div className="mt-4 rounded bg-muted/30 p-3">
+                          <p className="mb-1 text-xs font-medium text-muted-foreground">Solution</p>
+                          <p className="text-sm whitespace-pre-wrap">{q.solution_en}</p>
+                        </div>
+                      )}
+
+                      {!hasPaidAccess && (
+                        <div className="relative mt-4">
+                          <p className="select-none text-sm blur-sm">
+                            This is the detailed explanation for this question. Upgrade to see the full solution and understand the correct approach.
+                          </p>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Lock className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </main>
     </div>
   );

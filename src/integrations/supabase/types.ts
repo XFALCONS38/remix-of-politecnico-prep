@@ -14,129 +14,123 @@ export type Database = {
   }
   public: {
     Tables: {
-      answers: {
+      attempts: {
         Row: {
-          attempt_id: string
-          created_at: string
+          created_at: string | null
+          current_section: number | null
           id: string
-          is_correct: boolean | null
-          question_id: string
-          selected_option_index: number | null
-          time_spent_seconds: number
+          is_free_attempt: boolean | null
+          score: number | null
+          section_scores: Json | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["attempt_status"] | null
+          submitted_at: string | null
+          user_id: string
         }
         Insert: {
-          attempt_id: string
-          created_at?: string
+          created_at?: string | null
+          current_section?: number | null
           id?: string
-          is_correct?: boolean | null
-          question_id: string
-          selected_option_index?: number | null
-          time_spent_seconds?: number
+          is_free_attempt?: boolean | null
+          score?: number | null
+          section_scores?: Json | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["attempt_status"] | null
+          submitted_at?: string | null
+          user_id: string
         }
         Update: {
-          attempt_id?: string
-          created_at?: string
+          created_at?: string | null
+          current_section?: number | null
           id?: string
-          is_correct?: boolean | null
-          question_id?: string
-          selected_option_index?: number | null
-          time_spent_seconds?: number
+          is_free_attempt?: boolean | null
+          score?: number | null
+          section_scores?: Json | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["attempt_status"] | null
+          submitted_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      exam_attempt_answers: {
+        Row: {
+          assigned_letter: string
+          created_at: string | null
+          exam_attempt_id: string
+          id: string
+          options_snapshot: Json
+          question_id: string | null
+          question_order: number
+          section: string
+          student_answer: string | null
+        }
+        Insert: {
+          assigned_letter: string
+          created_at?: string | null
+          exam_attempt_id: string
+          id?: string
+          options_snapshot: Json
+          question_id?: string | null
+          question_order: number
+          section: string
+          student_answer?: string | null
+        }
+        Update: {
+          assigned_letter?: string
+          created_at?: string | null
+          exam_attempt_id?: string
+          id?: string
+          options_snapshot?: Json
+          question_id?: string | null
+          question_order?: number
+          section?: string
+          student_answer?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "answers_attempt_id_fkey"
-            columns: ["attempt_id"]
+            foreignKeyName: "exam_attempt_answers_exam_attempt_id_fkey"
+            columns: ["exam_attempt_id"]
             isOneToOne: false
             referencedRelation: "attempts"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "answers_question_id_fkey"
+            foreignKeyName: "exam_attempt_answers_question_id_fkey"
             columns: ["question_id"]
             isOneToOne: false
             referencedRelation: "questions"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "answers_question_id_fkey"
-            columns: ["question_id"]
-            isOneToOne: false
-            referencedRelation: "questions_public"
-            referencedColumns: ["id"]
-          },
         ]
       }
-      attempts: {
+      passages: {
         Row: {
-          created_at: string
-          current_section: number
-          exam_type_id: string
+          created_at: string | null
           id: string
-          is_free_attempt: boolean
-          score: number | null
-          section_scores: Json | null
-          started_at: string
-          status: Database["public"]["Enums"]["attempt_status"]
-          submitted_at: string | null
-          user_id: string
+          it_ready: boolean | null
+          passage_text_en: string
+          passage_text_it: string | null
+          set_id: string
+          title: string | null
         }
         Insert: {
-          created_at?: string
-          current_section?: number
-          exam_type_id: string
+          created_at?: string | null
           id?: string
-          is_free_attempt?: boolean
-          score?: number | null
-          section_scores?: Json | null
-          started_at?: string
-          status?: Database["public"]["Enums"]["attempt_status"]
-          submitted_at?: string | null
-          user_id: string
+          it_ready?: boolean | null
+          passage_text_en: string
+          passage_text_it?: string | null
+          set_id: string
+          title?: string | null
         }
         Update: {
-          created_at?: string
-          current_section?: number
-          exam_type_id?: string
+          created_at?: string | null
           id?: string
-          is_free_attempt?: boolean
-          score?: number | null
-          section_scores?: Json | null
-          started_at?: string
-          status?: Database["public"]["Enums"]["attempt_status"]
-          submitted_at?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "attempts_exam_type_id_fkey"
-            columns: ["exam_type_id"]
-            isOneToOne: false
-            referencedRelation: "exam_types"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      exam_types: {
-        Row: {
-          created_at: string
-          id: string
-          is_free_tier: boolean
-          name: string
-          scoring_rules: Json
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_free_tier?: boolean
-          name: string
-          scoring_rules: Json
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_free_tier?: boolean
-          name?: string
-          scoring_rules?: Json
+          it_ready?: boolean | null
+          passage_text_en?: string
+          passage_text_it?: string | null
+          set_id?: string
+          title?: string | null
         }
         Relationships: []
       }
@@ -166,39 +160,80 @@ export type Database = {
       }
       questions: {
         Row: {
-          correct_option_index: number
-          created_at: string
+          correct_answers: Json
+          created_at: string | null
           difficulty: string
-          explanation: string
           id: string
-          image_url: string | null
-          options: Json
-          question_text: string
+          is_active: boolean | null
+          it_ready: boolean | null
+          passage_id: string | null
+          passage_order: number | null
+          question_code: string
+          question_text_en: string
+          question_text_it: string | null
           section: string
+          set_id: string
+          solution_en: string
+          solution_it: string | null
+          subtopic: string | null
+          times_correct: number | null
+          times_served: number | null
+          topic: string
+          wrong_answers: Json
         }
         Insert: {
-          correct_option_index: number
-          created_at?: string
+          correct_answers: Json
+          created_at?: string | null
           difficulty: string
-          explanation: string
           id?: string
-          image_url?: string | null
-          options: Json
-          question_text: string
+          is_active?: boolean | null
+          it_ready?: boolean | null
+          passage_id?: string | null
+          passage_order?: number | null
+          question_code: string
+          question_text_en: string
+          question_text_it?: string | null
           section: string
+          set_id: string
+          solution_en: string
+          solution_it?: string | null
+          subtopic?: string | null
+          times_correct?: number | null
+          times_served?: number | null
+          topic: string
+          wrong_answers: Json
         }
         Update: {
-          correct_option_index?: number
-          created_at?: string
+          correct_answers?: Json
+          created_at?: string | null
           difficulty?: string
-          explanation?: string
           id?: string
-          image_url?: string | null
-          options?: Json
-          question_text?: string
+          is_active?: boolean | null
+          it_ready?: boolean | null
+          passage_id?: string | null
+          passage_order?: number | null
+          question_code?: string
+          question_text_en?: string
+          question_text_it?: string | null
           section?: string
+          set_id?: string
+          solution_en?: string
+          solution_it?: string | null
+          subtopic?: string | null
+          times_correct?: number | null
+          times_served?: number | null
+          topic?: string
+          wrong_answers?: Json
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "questions_passage_id_fkey"
+            columns: ["passage_id"]
+            isOneToOne: false
+            referencedRelation: "passages"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {
@@ -236,6 +271,35 @@ export type Database = {
         }
         Relationships: []
       }
+      user_question_history: {
+        Row: {
+          exam_attempt_id: string
+          question_id: string
+          seen_at: string | null
+          user_id: string
+        }
+        Insert: {
+          exam_attempt_id: string
+          question_id: string
+          seen_at?: string | null
+          user_id: string
+        }
+        Update: {
+          exam_attempt_id?: string
+          question_id?: string
+          seen_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_question_history_exam_attempt_id_fkey"
+            columns: ["exam_attempt_id"]
+            isOneToOne: false
+            referencedRelation: "attempts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -256,36 +320,7 @@ export type Database = {
       }
     }
     Views: {
-      questions_public: {
-        Row: {
-          created_at: string | null
-          difficulty: string | null
-          id: string | null
-          image_url: string | null
-          options: Json | null
-          question_text: string | null
-          section: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          difficulty?: string | null
-          id?: string | null
-          image_url?: string | null
-          options?: Json | null
-          question_text?: string | null
-          section?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          difficulty?: string | null
-          id?: string | null
-          image_url?: string | null
-          options?: Json | null
-          question_text?: string | null
-          section?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       has_active_access: { Args: { _user_id: string }; Returns: boolean }
