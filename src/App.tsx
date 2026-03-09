@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { ProtectedRoute, PaidRoute } from "@/components/ProtectedRoute";
+import { ProtectedRoute, PaidRoute, AdminRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -12,6 +12,7 @@ import Pricing from "./pages/Pricing";
 import Dashboard from "./pages/Dashboard";
 import Simulation from "./pages/Simulation";
 import Results from "./pages/Results";
+import Admin from "./pages/Admin";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import NotFound from "./pages/NotFound";
 
@@ -33,6 +34,7 @@ const App = () => (
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/simulation" element={<ProtectedRoute><Simulation /></ProtectedRoute>} />
             <Route path="/results/:attemptId" element={<ProtectedRoute><Results /></ProtectedRoute>} />
+            <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

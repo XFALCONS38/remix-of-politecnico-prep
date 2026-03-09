@@ -6,223 +6,131 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, ChevronLeft, ChevronRight, Flag } from "lucide-react";
+import { ChevronLeft, ChevronRight, Flag, Send } from "lucide-react";
 
-interface Section {
-  name: string;
-  label: string;
-  question_count: number;
-  time_minutes: number;
-}
-
-interface Question {
-  id: string;
+interface ExamQuestion {
+  eaa_id: string;
+  question_id: string;
   section: string;
-  question_text: string;
-  image_url: string | null;
-  options: string[];
-  difficulty: string;
+  question_order: number;
+  question_text_en: string;
+  passage_text_en: string | null;
+  options: Record<string, string>;
+  student_answer: string | null;
 }
 
-const SECTIONS: Section[] = [
-  { name: "math", label: "Mathematics", question_count: 16, time_minutes: 36 },
-  { name: "logic", label: "Comprehension & Logic", question_count: 10, time_minutes: 20 },
-  { name: "physics", label: "Physics", question_count: 10, time_minutes: 22 },
-  { name: "tech", label: "Technical Knowledge", question_count: 6, time_minutes: 12 },
-];
+const SECTION_LABELS: Record<string, string> = {
+  mathematics: "Mathematics",
+  logic: "Comprehension & Logic",
+  physics: "Physics",
+  technical: "Technical Knowledge",
+};
+
+const SECTION_ORDER = ["mathematics", "logic", "physics", "technical"];
 
 const Simulation = () => {
-  const { user } = useAuth();
+  const { user, hasActiveAccess } = useAuth();
   const navigate = useNavigate();
 
   const [attemptId, setAttemptId] = useState<string | null>(null);
-  const [currentSectionIdx, setCurrentSectionIdx] = useState(0);
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, number | null>>({});
+  const [questions, setQuestions] = useState<ExamQuestion[]>([]);
+  const [currentIdx, setCurrentIdx] = useState(0);
   const [flagged, setFlagged] = useState<Set<string>>(new Set());
-  const [sectionStartTime, setSectionStartTime] = useState<Date | null>(null);
-  const [timeLeft, setTimeLeft] = useState(0);
+  const [startedAt, setStartedAt] = useState<Date | null>(null);
+  const [timeLeft, setTimeLeft] = useState(90 * 60);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const questionStartRef = useRef(Date.now());
+  const [error, setError] = useState<string | null>(null);
 
-  // Arrow key navigation
+  // Arrow key + number key navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight" && currentQuestionIdx < questions.length - 1) {
-        setCurrentQuestionIdx((p) => p + 1);
-        questionStartRef.current = Date.now();
-      } else if (e.key === "ArrowLeft" && currentQuestionIdx > 0) {
-        setCurrentQuestionIdx((p) => p - 1);
-        questionStartRef.current = Date.now();
+      if (e.key === "ArrowRight" && currentIdx < questions.length - 1) {
+        setCurrentIdx((p) => p + 1);
+      } else if (e.key === "ArrowLeft" && currentIdx > 0) {
+        setCurrentIdx((p) => p - 1);
+      } else if (["1", "2", "3", "4", "5"].includes(e.key)) {
+        const letters = ["A", "B", "C", "D", "E"];
+        const letter = letters[parseInt(e.key) - 1];
+        const q = questions[currentIdx];
+        if (q && q.options[letter]) {
+          saveAnswer(q.eaa_id, letter);
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentQuestionIdx, questions.length]);
+  }, [currentIdx, questions]);
 
-  const currentSection = SECTIONS[currentSectionIdx];
-
-  // Initialize attempt
+  // Load exam
   useEffect(() => {
     if (!user) return;
-    const init = async () => {
-      // Check for existing in-progress attempt
-      const { data: existing } = await supabase
-        .from("attempts")
-        .select("id, current_section, started_at")
-        .eq("user_id", user.id)
-        .eq("status", "in_progress")
-        .maybeSingle();
+    const load = async () => {
+      try {
+        const { data, error: fnError } = await supabase.functions.invoke("generate-exam", {
+          body: { is_free: !hasActiveAccess },
+        });
 
-      if (existing) {
-        setAttemptId(existing.id);
-        setCurrentSectionIdx((existing.current_section ?? 1) - 1);
-        setSectionStartTime(new Date(existing.started_at));
-      } else {
-        // Get exam type
-        const { data: examType } = await supabase
-          .from("exam_types")
-          .select("id")
-          .eq("name", "TIL-I Engineering")
-          .maybeSingle();
+        if (fnError) throw new Error(fnError.message);
+        if (data?.error) throw new Error(data.error);
 
-        if (!examType) { toast({ title: "Error", description: "Exam type not found", variant: "destructive" }); return; }
+        setAttemptId(data.attempt_id);
+        setQuestions(data.questions);
+        setStartedAt(new Date(data.started_at));
 
-        // Check free attempt
-        const { count } = await supabase
-          .from("attempts")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", user.id);
-
-        const isFree = (count ?? 0) === 0;
-
-        const { data: attempt, error } = await supabase
-          .from("attempts")
-          .insert({ user_id: user.id, exam_type_id: examType.id, is_free_attempt: isFree, current_section: 1 })
-          .select("id, started_at")
-          .single();
-
-        if (error) { toast({ title: "Error", description: error.message, variant: "destructive" }); return; }
-        setAttemptId(attempt.id);
-        setSectionStartTime(new Date(attempt.started_at));
-      }
-      setLoading(false);
-    };
-    init();
-  }, [user]);
-
-  // Load questions for current section
-  useEffect(() => {
-    if (!attemptId) return;
-    const loadQuestions = async () => {
-      const section = SECTIONS[currentSectionIdx];
-      const { data } = await supabase
-        .from("questions_public")
-        .select("id, section, question_text, image_url, options, difficulty")
-        .eq("section", section.name);
-
-      if (data) {
-        // Shuffle and take required count, cast options
-        const shuffled = data
-          .sort(() => Math.random() - 0.5)
-          .slice(0, section.question_count)
-          .map((q) => ({ ...q, options: q.options as unknown as string[] }));
-        setQuestions(shuffled);
-        setCurrentQuestionIdx(0);
-        questionStartRef.current = Date.now();
-
-        // Load existing answers for this section
-        const qIds = shuffled.map((q) => q.id);
-        const { data: existingAnswers } = await supabase
-          .from("answers")
-          .select("question_id, selected_option_index")
-          .eq("attempt_id", attemptId)
-          .in("question_id", qIds);
-
-        if (existingAnswers) {
-          const ansMap: Record<string, number | null> = {};
-          existingAnswers.forEach((a) => { ansMap[a.question_id] = a.selected_option_index; });
-          setAnswers(ansMap);
+        // Restore position if resuming
+        if (data.resumed) {
+          const firstUnanswered = data.questions.findIndex((q: ExamQuestion) => !q.student_answer);
+          if (firstUnanswered >= 0) setCurrentIdx(firstUnanswered);
         }
+      } catch (err: any) {
+        setError(err.message);
+        toast({ title: "Error loading exam", description: err.message, variant: "destructive" });
+      } finally {
+        setLoading(false);
       }
-
-      // Set section start time
-      setSectionStartTime(new Date());
     };
-    loadQuestions();
-  }, [attemptId, currentSectionIdx]);
+    load();
+  }, [user, hasActiveAccess]);
 
-  // Timer
+  // 90-minute timer
   useEffect(() => {
-    if (!sectionStartTime || !currentSection) return;
+    if (!startedAt) return;
     const interval = setInterval(() => {
-      const elapsed = (Date.now() - sectionStartTime.getTime()) / 1000;
-      const remaining = Math.max(0, currentSection.time_minutes * 60 - elapsed);
+      const elapsed = (Date.now() - startedAt.getTime()) / 1000;
+      const remaining = Math.max(0, 90 * 60 - elapsed);
       setTimeLeft(Math.ceil(remaining));
-
       if (remaining <= 0) {
         clearInterval(interval);
-        handleNextSection(true);
+        handleSubmit(true);
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [sectionStartTime, currentSectionIdx]);
+  }, [startedAt]);
 
   // Save answer
-  const saveAnswer = useCallback(async (questionId: string, optionIndex: number | null) => {
-    if (!attemptId) return;
-    const timeSpent = Math.floor((Date.now() - questionStartRef.current) / 1000);
-
-    setAnswers((prev) => ({ ...prev, [questionId]: optionIndex }));
-
-    await supabase.from("answers").upsert(
-      { attempt_id: attemptId, question_id: questionId, selected_option_index: optionIndex, time_spent_seconds: timeSpent },
-      { onConflict: "attempt_id,question_id" }
+  const saveAnswer = useCallback(async (eaaId: string, letter: string | null) => {
+    setQuestions((prev) =>
+      prev.map((q) => (q.eaa_id === eaaId ? { ...q, student_answer: letter } : q))
     );
-  }, [attemptId]);
+    await (supabase as any).from("exam_attempt_answers").update({ student_answer: letter }).eq("id", eaaId);
+  }, []);
 
-  // Next section
-  const handleNextSection = useCallback(async (auto = false) => {
-    if (!attemptId) return;
-
-    // Save blank answers for unanswered questions
-    for (const q of questions) {
-      if (answers[q.id] === undefined) {
-        await supabase.from("answers").upsert(
-          { attempt_id: attemptId, question_id: q.id, selected_option_index: null, time_spent_seconds: 0 },
-          { onConflict: "attempt_id,question_id" }
-        );
-      }
-    }
-
-    if (currentSectionIdx < SECTIONS.length - 1) {
-      const nextSection = currentSectionIdx + 1;
-      setCurrentSectionIdx(nextSection);
-      setAnswers({});
-      setFlagged(new Set());
-
-      await supabase.from("attempts").update({ current_section: nextSection + 1 }).eq("id", attemptId);
-      setSectionStartTime(new Date());
-
-      if (auto) toast({ title: "Time's up!", description: `Moving to ${SECTIONS[nextSection].label}` });
-    } else {
-      handleSubmit();
-    }
-  }, [attemptId, currentSectionIdx, questions, answers]);
-
-  // Submit
-  const handleSubmit = async () => {
+  // Submit exam
+  const handleSubmit = async (auto = false) => {
     if (!attemptId || submitting) return;
     setSubmitting(true);
 
-    const { data, error } = await supabase.functions.invoke("score-attempt", {
+    if (auto) {
+      toast({ title: "Time's up!", description: "Your exam has been automatically submitted." });
+    }
+
+    const { data, error: fnError } = await supabase.functions.invoke("score-attempt", {
       body: { attempt_id: attemptId },
     });
 
-    if (error) {
-      toast({ title: "Scoring failed", description: "Please try again", variant: "destructive" });
+    if (fnError || data?.error) {
+      toast({ title: "Scoring failed", description: data?.error || fnError?.message, variant: "destructive" });
       setSubmitting(false);
       return;
     }
@@ -238,12 +146,31 @@ const Simulation = () => {
     });
   };
 
-  if (loading) return <div className="flex min-h-screen items-center justify-center">Preparing your exam...</div>;
+  if (loading) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Preparing your exam...</div>;
+  if (error) return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4">
+      <p className="text-destructive">{error}</p>
+      <Button onClick={() => navigate("/dashboard")}>Back to Dashboard</Button>
+    </div>
+  );
 
-  const currentQuestion = questions[currentQuestionIdx];
+  const currentQuestion = questions[currentIdx];
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
-  const timerColor = timeLeft <= 30 ? "text-destructive animate-pulse-fast" : timeLeft <= 120 ? "text-destructive" : timeLeft <= 300 ? "text-warning" : "text-foreground";
+  const timerColor = timeLeft <= 30 ? "text-destructive animate-pulse" : timeLeft <= 120 ? "text-destructive" : timeLeft <= 300 ? "text-warning" : "text-foreground";
+
+  // Group questions by section for sidebar
+  const sectionGroups = SECTION_ORDER.map((section) => ({
+    section,
+    label: SECTION_LABELS[section],
+    questions: questions.filter((q) => q.section === section),
+    startIdx: questions.findIndex((q) => q.section === section),
+  })).filter((g) => g.questions.length > 0);
+
+  const answeredCount = questions.filter((q) => q.student_answer).length;
+
+  // Current passage (if any)
+  const currentPassage = currentQuestion?.passage_text_en;
 
   return (
     <div className="min-h-screen bg-background">
@@ -251,51 +178,55 @@ const Simulation = () => {
       <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur">
         <div className="container flex h-14 items-center justify-between">
           <div className="flex items-center gap-4">
-            <span className="text-sm font-medium">{currentSection.label}</span>
+            <span className="text-sm font-medium">
+              {SECTION_LABELS[currentQuestion?.section] ?? "Exam"}
+            </span>
             <span className="text-xs text-muted-foreground">
-              Section {currentSectionIdx + 1}/4
+              {answeredCount}/{questions.length} answered
             </span>
           </div>
           <div className={cn("text-2xl font-mono font-bold tabular-nums", timerColor)}>
             {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
           </div>
-          <div className="flex items-center gap-2">
-            {currentSectionIdx < SECTIONS.length - 1 ? (
-              <Button variant="outline" size="sm" onClick={() => handleNextSection(false)}>
-                Next Section →
-              </Button>
-            ) : (
-              <Button size="sm" onClick={handleSubmit} disabled={submitting}>
-                {submitting ? "Submitting..." : "Submit Exam"}
-              </Button>
-            )}
-          </div>
+          <Button size="sm" onClick={() => handleSubmit(false)} disabled={submitting} className="gap-1">
+            <Send className="h-3.5 w-3.5" />
+            {submitting ? "Submitting..." : "Submit Exam"}
+          </Button>
         </div>
       </header>
 
       <div className="container flex gap-6 py-6">
         {/* Question nav sidebar */}
-        <div className="hidden w-48 shrink-0 md:block">
-          <div className="sticky top-20 space-y-1">
-            <p className="mb-3 text-xs font-medium text-muted-foreground uppercase">Questions</p>
-            <div className="grid grid-cols-4 gap-1.5">
-              {questions.map((q, i) => (
-                <button
-                  key={q.id}
-                  onClick={() => { setCurrentQuestionIdx(i); questionStartRef.current = Date.now(); }}
-                  className={cn(
-                    "flex h-9 w-9 items-center justify-center rounded text-xs font-medium transition-colors",
-                    i === currentQuestionIdx && "ring-2 ring-primary",
-                    answers[q.id] !== undefined && answers[q.id] !== null
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-secondary-foreground",
-                    flagged.has(q.id) && "ring-2 ring-warning"
-                  )}
-                >
-                  {i + 1}
-                </button>
-              ))}
-            </div>
+        <div className="hidden w-52 shrink-0 md:block">
+          <div className="sticky top-20 space-y-4">
+            {sectionGroups.map((group) => (
+              <div key={group.section}>
+                <p className="mb-2 text-xs font-medium text-muted-foreground uppercase">
+                  {group.label}
+                </p>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {group.questions.map((q, i) => {
+                    const globalIdx = group.startIdx + i;
+                    return (
+                      <button
+                        key={q.eaa_id}
+                        onClick={() => setCurrentIdx(globalIdx)}
+                        className={cn(
+                          "flex h-8 w-8 items-center justify-center rounded text-xs font-medium transition-colors",
+                          globalIdx === currentIdx && "ring-2 ring-primary",
+                          q.student_answer
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-secondary text-secondary-foreground",
+                          flagged.has(q.eaa_id) && "ring-2 ring-warning"
+                        )}
+                      >
+                        {globalIdx + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
             <div className="mt-4 space-y-1 text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
                 <div className="h-3 w-3 rounded bg-primary" /> Answered
@@ -310,74 +241,105 @@ const Simulation = () => {
           </div>
         </div>
 
-        {/* Question */}
+        {/* Question area */}
         <div className="flex-1">
           {currentQuestion && (
-            <Card>
-              <CardContent className="p-6">
-                <div className="mb-6 flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Question {currentQuestionIdx + 1} of {questions.length}
-                  </span>
-                  <Button
-                    variant={flagged.has(currentQuestion.id) ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => toggleFlag(currentQuestion.id)}
-                    className="gap-1"
-                  >
-                    <Flag className="h-3.5 w-3.5" />
-                    {flagged.has(currentQuestion.id) ? "Flagged" : "Flag"}
-                  </Button>
-                </div>
+            <>
+              {/* Passage block */}
+              {currentPassage && (
+                <Card className="mb-4">
+                  <CardContent className="p-6">
+                    <p className="mb-2 text-xs font-medium text-muted-foreground uppercase">Reading Passage</p>
+                    <div className="prose prose-sm max-w-none text-foreground whitespace-pre-wrap">
+                      {currentPassage}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
-                <p className="mb-6 text-lg font-medium leading-relaxed">{currentQuestion.question_text}</p>
-
-                {currentQuestion.image_url && (
-                  <img src={currentQuestion.image_url} alt="Question diagram" className="mb-6 max-h-64 rounded-lg" />
-                )}
-
-                <div className="space-y-2">
-                  {(currentQuestion.options as string[]).map((option, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => saveAnswer(currentQuestion.id, idx)}
-                      className={cn(
-                        "flex w-full items-center gap-3 rounded-lg border p-4 text-left transition-colors",
-                        answers[currentQuestion.id] === idx
-                          ? "border-primary bg-primary/10"
-                          : "hover:bg-secondary"
+              <Card>
+                <CardContent className="p-6">
+                  <div className="mb-6 flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      Question {currentIdx + 1} of {questions.length}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {currentQuestion.student_answer && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => saveAnswer(currentQuestion.eaa_id, null)}
+                          className="text-xs text-muted-foreground"
+                        >
+                          Clear
+                        </Button>
                       )}
-                    >
-                      <span className={cn(
-                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-sm font-medium",
-                        answers[currentQuestion.id] === idx
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : ""
-                      )}>
-                        {String.fromCharCode(65 + idx)}
-                      </span>
-                      <span>{option}</span>
-                    </button>
-                  ))}
-                </div>
+                      <Button
+                        variant={flagged.has(currentQuestion.eaa_id) ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => toggleFlag(currentQuestion.eaa_id)}
+                        className="gap-1"
+                      >
+                        <Flag className="h-3.5 w-3.5" />
+                        {flagged.has(currentQuestion.eaa_id) ? "Flagged" : "Flag"}
+                      </Button>
+                    </div>
+                  </div>
 
-                <div className="mt-8 flex items-center justify-between">
-                  <Button
-                    variant="outline"
-                    disabled={currentQuestionIdx === 0}
-                    onClick={() => { setCurrentQuestionIdx((p) => p - 1); questionStartRef.current = Date.now(); }}
-                  >
-                    <ChevronLeft className="mr-1 h-4 w-4" /> Previous
-                  </Button>
-                  <Button
-                    disabled={currentQuestionIdx === questions.length - 1}
-                    onClick={() => { setCurrentQuestionIdx((p) => p + 1); questionStartRef.current = Date.now(); }}
-                  >
-                    Next <ChevronRight className="ml-1 h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                  <p className="mb-6 text-lg font-medium leading-relaxed">
+                    {currentQuestion.question_text_en}
+                  </p>
+
+                  <div className="space-y-2">
+                    {["A", "B", "C", "D", "E"].map((letter) => {
+                      const text = currentQuestion.options[letter];
+                      if (!text) return null;
+                      const isSelected = currentQuestion.student_answer === letter;
+                      return (
+                        <button
+                          key={letter}
+                          onClick={() => saveAnswer(currentQuestion.eaa_id, letter)}
+                          className={cn(
+                            "flex w-full items-center gap-3 rounded-lg border p-4 text-left transition-colors",
+                            isSelected
+                              ? "border-primary bg-primary/10"
+                              : "hover:bg-secondary"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-sm font-medium",
+                              isSelected
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : ""
+                            )}
+                          >
+                            {letter}
+                          </span>
+                          <span>{text}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-8 flex items-center justify-between">
+                    <Button
+                      variant="outline"
+                      disabled={currentIdx === 0}
+                      onClick={() => setCurrentIdx((p) => p - 1)}
+                    >
+                      <ChevronLeft className="mr-1 h-4 w-4" /> Previous
+                    </Button>
+                    <Button
+                      disabled={currentIdx === questions.length - 1}
+                      onClick={() => setCurrentIdx((p) => p + 1)}
+                    >
+                      Next <ChevronRight className="ml-1 h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
           )}
         </div>
       </div>
