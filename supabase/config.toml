@@ -5,3 +5,12 @@ verify_jwt = false
 
 [functions.score-attempt]
 verify_jwt = false
+
+[functions.generate-exam]
+verify_jwt = false
+
+[functions.get-exam-review]
+verify_jwt = false
+
+[functions.admin-questions]
+verify_jwt = false
