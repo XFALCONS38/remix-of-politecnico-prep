@@ -15,13 +15,12 @@ serve(async (req) => {
     const { attempt_id } = await req.json();
     if (!attempt_id) throw new Error("attempt_id required");
 
-    // Use service role to bypass RLS and read correct answers
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Verify the attempt exists and is in_progress
+    // Verify attempt
     const { data: attempt, error: attemptErr } = await supabase
       .from("attempts")
       .select("id, user_id, status")
@@ -31,7 +30,7 @@ serve(async (req) => {
     if (attemptErr || !attempt) throw new Error("Attempt not found");
     if (attempt.status !== "in_progress") throw new Error("Attempt already submitted");
 
-    // Verify caller owns this attempt
+    // Verify caller
     const authHeader = req.headers.get("Authorization");
     if (authHeader) {
       const token = authHeader.replace("Bearer ", "");
@@ -43,67 +42,41 @@ serve(async (req) => {
       if (userData?.user?.id !== attempt.user_id) throw new Error("Unauthorized");
     }
 
-    // Get all answers for this attempt
-    const { data: answers } = await supabase
-      .from("answers")
-      .select("id, question_id, selected_option_index")
-      .eq("attempt_id", attempt_id);
+    // Get all exam_attempt_answers
+    const { data: eaas } = await supabase
+      .from("exam_attempt_answers")
+      .select("id, question_id, section, assigned_letter, student_answer")
+      .eq("exam_attempt_id", attempt_id);
 
-    if (!answers) throw new Error("No answers found");
+    if (!eaas || eaas.length === 0) throw new Error("No answers found");
 
-    // Get all questions with correct answers
-    const questionIds = answers.map(a => a.question_id);
-    const { data: questions } = await supabase
-      .from("questions")
-      .select("id, correct_option_index, section")
-      .in("id", questionIds);
-
-    if (!questions) throw new Error("Questions not found");
-
-    const questionMap = new Map(questions.map(q => [q.id, q]));
-
-    // Score each answer
+    // Score
     let totalScore = 0;
     const sectionData: Record<string, { correct: number; wrong: number; blank: number; score: number; total: number }> = {};
+    const correctQuestionIds: string[] = [];
 
-    for (const answer of answers) {
-      const question = questionMap.get(answer.question_id);
-      if (!question) continue;
-
-      const section = question.section;
+    for (const eaa of eaas) {
+      const section = eaa.section;
       if (!sectionData[section]) {
         sectionData[section] = { correct: 0, wrong: 0, blank: 0, score: 0, total: 0 };
       }
       sectionData[section].total++;
 
-      let isCorrect: boolean | null = null;
-      let pointsEarned = 0;
-
-      if (answer.selected_option_index === null) {
-        // Blank = 0 points
+      if (eaa.student_answer === null || eaa.student_answer === "") {
+        // Blank
         sectionData[section].blank++;
-        isCorrect = null;
-        pointsEarned = 0;
-      } else if (answer.selected_option_index === question.correct_option_index) {
-        // Correct = +1.0
+      } else if (eaa.student_answer === eaa.assigned_letter) {
+        // Correct +1.0
         sectionData[section].correct++;
-        isCorrect = true;
-        pointsEarned = 1.0;
+        sectionData[section].score += 1.0;
+        totalScore += 1.0;
+        correctQuestionIds.push(eaa.question_id);
       } else {
-        // Wrong = -0.25
+        // Wrong -0.25
         sectionData[section].wrong++;
-        isCorrect = false;
-        pointsEarned = -0.25;
+        sectionData[section].score -= 0.25;
+        totalScore -= 0.25;
       }
-
-      totalScore += pointsEarned;
-      sectionData[section].score += pointsEarned;
-
-      // Update answer with is_correct
-      await supabase
-        .from("answers")
-        .update({ is_correct: isCorrect })
-        .eq("id", answer.id);
     }
 
     // Update attempt
@@ -117,6 +90,21 @@ serve(async (req) => {
       })
       .eq("id", attempt_id);
 
+    // Increment times_correct for correct questions
+    for (const qId of correctQuestionIds) {
+      const { data: q } = await supabase
+        .from("questions")
+        .select("times_correct")
+        .eq("id", qId)
+        .single();
+      if (q) {
+        await supabase
+          .from("questions")
+          .update({ times_correct: (q.times_correct ?? 0) + 1 })
+          .eq("id", qId);
+      }
+    }
+
     return new Response(JSON.stringify({
       score: totalScore,
       section_scores: sectionData,
@@ -125,7 +113,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
-  } catch (error) {
+  } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
