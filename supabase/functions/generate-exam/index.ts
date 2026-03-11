@@ -322,12 +322,21 @@ serve(async (req) => {
       passageText = passage?.passage_text_en ?? null;
     }
 
+    // Expected totals per section
+    const SECTION_TOTALS: Record<string, number> = {
+      mathematics: 16,
+      logic: 10,
+      physics: 10,
+      technical: 6,
+    };
+
     // Build ordered question list
     let questionOrder = 1;
     const orderedQuestions: Array<{ question: any; section: string; order: number; passageText?: string }> = [];
     const sections = ["mathematics", "logic", "physics", "technical"];
 
     for (const section of sections) {
+      const sectionStart = orderedQuestions.length;
       const quotas = SECTION_QUOTAS[section];
       for (const slot of quotas) {
         if (slot.topics.includes("text_comprehension")) {
@@ -338,6 +347,24 @@ serve(async (req) => {
         }
         const selected = selectForSlot(section, slot.topics, slot.count);
         for (const q of selected) {
+          orderedQuestions.push({ question: q, section, order: questionOrder++ });
+        }
+      }
+
+      // Fill any shortfall from remaining unused questions in this section
+      const sectionCount = orderedQuestions.length - sectionStart;
+      const expectedTotal = SECTION_TOTALS[section] ?? sectionCount;
+      if (sectionCount < expectedTotal) {
+        const deficit = expectedTotal - sectionCount;
+        const remaining = allQuestions.filter((q: any) =>
+          q.section === section && !usedIds.has(q.id)
+        );
+        const unseen = remaining.filter((q: any) => !excludedIds.includes(q.id));
+        const seen = remaining.filter((q: any) => excludedIds.includes(q.id));
+        const fillPool = shuffle([...unseen, ...seen]);
+        for (const q of fillPool) {
+          if (orderedQuestions.length - sectionStart >= expectedTotal) break;
+          usedIds.add(q.id);
           orderedQuestions.push({ question: q, section, order: questionOrder++ });
         }
       }

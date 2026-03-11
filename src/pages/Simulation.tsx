@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Flag, Send } from "lucide-react";
+import { ChevronLeft, ChevronRight, Flag, Send, Lock, ChevronLast } from "lucide-react";
 
 interface ExamQuestion {
   eaa_id: string;
@@ -28,6 +28,13 @@ const SECTION_LABELS: Record<string, string> = {
 
 const SECTION_ORDER = ["mathematics", "logic", "physics", "technical"];
 
+const SECTION_TIMES: Record<string, number> = {
+  mathematics: 36 * 60,
+  logic: 20 * 60,
+  physics: 22 * 60,
+  technical: 12 * 60,
+};
+
 const Simulation = () => {
   const { user, hasActiveAccess } = useAuth();
   const navigate = useNavigate();
@@ -36,19 +43,42 @@ const Simulation = () => {
   const [questions, setQuestions] = useState<ExamQuestion[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [flagged, setFlagged] = useState<Set<string>>(new Set());
-  const [startedAt, setStartedAt] = useState<Date | null>(null);
-  const [timeLeft, setTimeLeft] = useState(90 * 60);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Arrow key + number key navigation
+  // Kill-switch section state
+  const [activeSectionIdx, setActiveSectionIdx] = useState(0);
+  const [sectionStartedAt, setSectionStartedAt] = useState<Date | null>(null);
+  const [sectionTimeLeft, setSectionTimeLeft] = useState(SECTION_TIMES[SECTION_ORDER[0]]);
+  const [completedSections, setCompletedSections] = useState<Set<number>>(new Set());
+
+  // Group questions by section
+  const sectionGroups = SECTION_ORDER.map((section, idx) => ({
+    section,
+    idx,
+    label: SECTION_LABELS[section],
+    questions: questions.filter((q) => q.section === section),
+  })).filter((g) => g.questions.length > 0);
+
+  const activeSection = SECTION_ORDER[activeSectionIdx];
+  const activeSectionQuestions = questions.filter((q) => q.section === activeSection);
+  const currentLocalIdx = activeSectionQuestions.findIndex(
+    (q) => q.eaa_id === questions[currentIdx]?.eaa_id
+  );
+
+  // Arrow key + number key navigation (within current section only)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight" && currentIdx < questions.length - 1) {
-        setCurrentIdx((p) => p + 1);
-      } else if (e.key === "ArrowLeft" && currentIdx > 0) {
-        setCurrentIdx((p) => p - 1);
+      const globalIndices = activeSectionQuestions.map((q) =>
+        questions.findIndex((gq) => gq.eaa_id === q.eaa_id)
+      );
+      const posInSection = globalIndices.indexOf(currentIdx);
+
+      if (e.key === "ArrowRight" && posInSection < globalIndices.length - 1) {
+        setCurrentIdx(globalIndices[posInSection + 1]);
+      } else if (e.key === "ArrowLeft" && posInSection > 0) {
+        setCurrentIdx(globalIndices[posInSection - 1]);
       } else if (["1", "2", "3", "4", "5"].includes(e.key)) {
         const letters = ["A", "B", "C", "D", "E"];
         const letter = letters[parseInt(e.key) - 1];
@@ -60,7 +90,7 @@ const Simulation = () => {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentIdx, questions]);
+  }, [currentIdx, questions, activeSectionIdx]);
 
   // Load exam
   useEffect(() => {
@@ -76,12 +106,23 @@ const Simulation = () => {
 
         setAttemptId(data.attempt_id);
         setQuestions(data.questions);
-        setStartedAt(new Date(data.started_at));
+        setSectionStartedAt(new Date());
 
-        // Restore position if resuming
         if (data.resumed) {
           const firstUnanswered = data.questions.findIndex((q: ExamQuestion) => !q.student_answer);
-          if (firstUnanswered >= 0) setCurrentIdx(firstUnanswered);
+          if (firstUnanswered >= 0) {
+            // Determine which section that question belongs to
+            const resumeSection = data.questions[firstUnanswered].section;
+            const sectionIdx = SECTION_ORDER.indexOf(resumeSection);
+            if (sectionIdx > 0) {
+              setActiveSectionIdx(sectionIdx);
+              setSectionTimeLeft(SECTION_TIMES[SECTION_ORDER[sectionIdx]]);
+              const completed = new Set<number>();
+              for (let i = 0; i < sectionIdx; i++) completed.add(i);
+              setCompletedSections(completed);
+            }
+            setCurrentIdx(firstUnanswered);
+          }
         }
       } catch (err: any) {
         setError(err.message);
@@ -93,20 +134,53 @@ const Simulation = () => {
     load();
   }, [user, hasActiveAccess]);
 
-  // 90-minute timer
+  // Per-section timer
   useEffect(() => {
-    if (!startedAt) return;
+    if (!sectionStartedAt) return;
+    const sectionKey = SECTION_ORDER[activeSectionIdx];
+    const totalTime = SECTION_TIMES[sectionKey];
+
     const interval = setInterval(() => {
-      const elapsed = (Date.now() - startedAt.getTime()) / 1000;
-      const remaining = Math.max(0, 90 * 60 - elapsed);
-      setTimeLeft(Math.ceil(remaining));
+      const elapsed = (Date.now() - sectionStartedAt.getTime()) / 1000;
+      const remaining = Math.max(0, totalTime - elapsed);
+      setSectionTimeLeft(Math.ceil(remaining));
       if (remaining <= 0) {
         clearInterval(interval);
-        handleSubmit(true);
+        advanceSection(true);
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [startedAt]);
+  }, [sectionStartedAt, activeSectionIdx]);
+
+  // Advance to next section (or submit if last)
+  const advanceSection = useCallback((auto = false) => {
+    const nextIdx = activeSectionIdx + 1;
+    if (auto) {
+      toast({
+        title: `Time's up for ${SECTION_LABELS[SECTION_ORDER[activeSectionIdx]]}!`,
+        description: nextIdx < SECTION_ORDER.length
+          ? `Moving to ${SECTION_LABELS[SECTION_ORDER[nextIdx]]}.`
+          : "Submitting your exam...",
+      });
+    }
+
+    setCompletedSections((prev) => new Set([...prev, activeSectionIdx]));
+
+    if (nextIdx >= SECTION_ORDER.length) {
+      // Last section done — submit
+      handleSubmit(true);
+      return;
+    }
+
+    setActiveSectionIdx(nextIdx);
+    setSectionStartedAt(new Date());
+    setSectionTimeLeft(SECTION_TIMES[SECTION_ORDER[nextIdx]]);
+
+    // Jump to first question of next section
+    const nextSection = SECTION_ORDER[nextIdx];
+    const firstQ = questions.findIndex((q) => q.section === nextSection);
+    if (firstQ >= 0) setCurrentIdx(firstQ);
+  }, [activeSectionIdx, questions]);
 
   // Save answer
   const saveAnswer = useCallback(async (eaaId: string, letter: string | null) => {
@@ -121,8 +195,8 @@ const Simulation = () => {
     if (!attemptId || submitting) return;
     setSubmitting(true);
 
-    if (auto) {
-      toast({ title: "Time's up!", description: "Your exam has been automatically submitted." });
+    if (auto && activeSectionIdx >= SECTION_ORDER.length - 1) {
+      toast({ title: "Exam complete!", description: "Your exam has been automatically submitted." });
     }
 
     const { data, error: fnError } = await supabase.functions.invoke("score-attempt", {
@@ -155,21 +229,20 @@ const Simulation = () => {
   );
 
   const currentQuestion = questions[currentIdx];
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
-  const timerColor = timeLeft <= 30 ? "text-destructive animate-pulse" : timeLeft <= 120 ? "text-destructive" : timeLeft <= 300 ? "text-warning" : "text-foreground";
+  const minutes = Math.floor(sectionTimeLeft / 60);
+  const seconds = sectionTimeLeft % 60;
+  const timerColor = sectionTimeLeft <= 30 ? "text-destructive animate-pulse" : sectionTimeLeft <= 120 ? "text-destructive" : sectionTimeLeft <= 300 ? "text-warning" : "text-foreground";
 
-  // Group questions by section for sidebar
-  const sectionGroups = SECTION_ORDER.map((section) => ({
-    section,
-    label: SECTION_LABELS[section],
-    questions: questions.filter((q) => q.section === section),
-    startIdx: questions.findIndex((q) => q.section === section),
-  })).filter((g) => g.questions.length > 0);
+  const answeredInSection = activeSectionQuestions.filter((q) => q.student_answer).length;
 
-  const answeredCount = questions.filter((q) => q.student_answer).length;
+  // Navigation helpers within current section
+  const globalIndices = activeSectionQuestions.map((q) =>
+    questions.findIndex((gq) => gq.eaa_id === q.eaa_id)
+  );
+  const posInSection = globalIndices.indexOf(currentIdx);
+  const canGoPrev = posInSection > 0;
+  const canGoNext = posInSection < globalIndices.length - 1;
 
-  // Current passage (if any)
   const currentPassage = currentQuestion?.passage_text_en;
 
   return (
@@ -179,54 +252,96 @@ const Simulation = () => {
         <div className="container flex h-14 items-center justify-between">
           <div className="flex items-center gap-4">
             <span className="text-sm font-medium">
-              {SECTION_LABELS[currentQuestion?.section] ?? "Exam"}
+              {SECTION_LABELS[activeSection] ?? "Exam"}
             </span>
             <span className="text-xs text-muted-foreground">
-              {answeredCount}/{questions.length} answered
+              {answeredInSection}/{activeSectionQuestions.length} answered
             </span>
           </div>
           <div className={cn("text-2xl font-mono font-bold tabular-nums", timerColor)}>
             {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
           </div>
-          <Button size="sm" onClick={() => handleSubmit(false)} disabled={submitting} className="gap-1">
-            <Send className="h-3.5 w-3.5" />
-            {submitting ? "Submitting..." : "Submit Exam"}
-          </Button>
+          <div className="flex items-center gap-2">
+            {activeSectionIdx < SECTION_ORDER.length - 1 ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => advanceSection(false)}
+                className="gap-1"
+              >
+                <ChevronLast className="h-3.5 w-3.5" />
+                Next Section
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => handleSubmit(false)} disabled={submitting} className="gap-1">
+                <Send className="h-3.5 w-3.5" />
+                {submitting ? "Submitting..." : "Submit Exam"}
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
+      {/* Section tabs */}
+      <div className="border-b bg-card/50">
+        <div className="container flex gap-1 py-1.5 overflow-x-auto">
+          {sectionGroups.map((group) => {
+            const isActive = group.idx === activeSectionIdx;
+            const isCompleted = completedSections.has(group.idx);
+            const isLocked = group.idx > activeSectionIdx;
+            const sectionAnswered = group.questions.filter((q) => q.student_answer).length;
+
+            return (
+              <button
+                key={group.section}
+                disabled={isLocked || isCompleted}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap",
+                  isActive && "bg-primary text-primary-foreground",
+                  isCompleted && "bg-muted text-muted-foreground",
+                  isLocked && "text-muted-foreground/50 cursor-not-allowed",
+                  !isActive && !isCompleted && !isLocked && "hover:bg-secondary"
+                )}
+              >
+                {isLocked && <Lock className="h-3 w-3" />}
+                {group.label}
+                <span className="text-[10px] opacity-70">
+                  ({sectionAnswered}/{group.questions.length})
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="container flex gap-6 py-6">
-        {/* Question nav sidebar */}
+        {/* Question nav sidebar — current section only */}
         <div className="hidden w-52 shrink-0 md:block">
-          <div className="sticky top-20 space-y-4">
-            {sectionGroups.map((group) => (
-              <div key={group.section}>
-                <p className="mb-2 text-xs font-medium text-muted-foreground uppercase">
-                  {group.label}
-                </p>
-                <div className="grid grid-cols-5 gap-1.5">
-                  {group.questions.map((q, i) => {
-                    const globalIdx = group.startIdx + i;
-                    return (
-                      <button
-                        key={q.eaa_id}
-                        onClick={() => setCurrentIdx(globalIdx)}
-                        className={cn(
-                          "flex h-8 w-8 items-center justify-center rounded text-xs font-medium transition-colors",
-                          globalIdx === currentIdx && "ring-2 ring-primary",
-                          q.student_answer
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-secondary text-secondary-foreground",
-                          flagged.has(q.eaa_id) && "ring-2 ring-warning"
-                        )}
-                      >
-                        {globalIdx + 1}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+          <div className="sticky top-28 space-y-4">
+            <p className="mb-2 text-xs font-medium text-muted-foreground uppercase">
+              {SECTION_LABELS[activeSection]}
+            </p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {activeSectionQuestions.map((q, i) => {
+                const globalIdx = globalIndices[i];
+                return (
+                  <button
+                    key={q.eaa_id}
+                    onClick={() => setCurrentIdx(globalIdx)}
+                    className={cn(
+                      "flex h-8 w-8 items-center justify-center rounded text-xs font-medium transition-colors",
+                      globalIdx === currentIdx && "ring-2 ring-primary",
+                      q.student_answer
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-secondary-foreground",
+                      flagged.has(q.eaa_id) && "ring-2 ring-warning"
+                    )}
+                  >
+                    {i + 1}
+                  </button>
+                );
+              })}
+            </div>
             <div className="mt-4 space-y-1 text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
                 <div className="h-3 w-3 rounded bg-primary" /> Answered
@@ -243,9 +358,8 @@ const Simulation = () => {
 
         {/* Question area */}
         <div className="flex-1">
-          {currentQuestion && (
+          {currentQuestion && currentQuestion.section === activeSection && (
             <>
-              {/* Passage block */}
               {currentPassage && (
                 <Card className="mb-4">
                   <CardContent className="p-6">
@@ -261,7 +375,7 @@ const Simulation = () => {
                 <CardContent className="p-6">
                   <div className="mb-6 flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">
-                      Question {currentIdx + 1} of {questions.length}
+                      Question {posInSection + 1} of {activeSectionQuestions.length}
                     </span>
                     <div className="flex items-center gap-2">
                       {currentQuestion.student_answer && (
@@ -325,14 +439,14 @@ const Simulation = () => {
                   <div className="mt-8 flex items-center justify-between">
                     <Button
                       variant="outline"
-                      disabled={currentIdx === 0}
-                      onClick={() => setCurrentIdx((p) => p - 1)}
+                      disabled={!canGoPrev}
+                      onClick={() => setCurrentIdx(globalIndices[posInSection - 1])}
                     >
                       <ChevronLeft className="mr-1 h-4 w-4" /> Previous
                     </Button>
                     <Button
-                      disabled={currentIdx === questions.length - 1}
-                      onClick={() => setCurrentIdx((p) => p + 1)}
+                      disabled={!canGoNext}
+                      onClick={() => setCurrentIdx(globalIndices[posInSection + 1])}
                     >
                       Next <ChevronRight className="ml-1 h-4 w-4" />
                     </Button>
