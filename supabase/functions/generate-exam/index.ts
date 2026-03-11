@@ -420,12 +420,6 @@ serve(async (req) => {
     // Increment times_served
     const qIds = orderedQuestions.map(oq => oq.question.id);
     for (const qId of qIds) {
-      await supabase.rpc("increment_times_served_noop", { q_id: qId }).catch(() => {
-        // fallback: manual update
-      });
-    }
-    // Manual increment since rpc may not exist yet
-    for (const qId of qIds) {
       await supabase
         .from("questions")
         .update({ times_served: (allQuestions.find((q: any) => q.id === qId)?.times_served ?? 0) + 1 })
