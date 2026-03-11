@@ -1,32 +1,34 @@
 
+# TILprep Brand System Implementation
 
-# Seed SET_01: Passage + 26 Math Questions + 10 Logic + 10 Physics + 6 Technical
+## Summary
+Apply the complete TILprep brand system: updated color palette, refined typography sizes, and a new 3-tier button system (Primary = outlined, Secondary = green filled, Ghost = text only).
 
-## What exists
-- `passages` table: 0 rows for SET_01
-- `questions` table: 0 rows for SET_01
-- `admin-questions` edge function: supports `bulk_insert_passages` and `bulk_insert` actions
+## Changes
 
-## Plan
+### 1. `src/index.css` -- Color & Typography Updates
+- Update `--foreground` to Soft Charcoal (#2A2A2A / `0 0% 16.5%`)
+- Update `--warning` to Warm Amber (#F5A623 / `37 91% 55%`)
+- Card foreground, popover foreground, and secondary foreground updated to match new text color
+- Typography sizes already correct (H1 40px/600, H2 28px/500, H3 20px/500, body 16px)
 
-### Step 1: Insert the passage
-Use the `admin-questions` edge function with `bulk_insert_passages` to insert the acoustic metamaterials passage. Retrieve the generated UUID.
+### 2. `src/components/ui/button.tsx` -- New Button System
+- **default (Primary)**: Transparent background, 1px solid border using primary color (#1E2A38), primary text color, 10px radius, hover lightens background
+- **secondary**: Background #2BB673, white text, hover #249E62, padding 12px 20px
+- **ghost**: Text only, no border (already close, just ensure clean styling)
+- **outline**: Keep as-is for backwards compatibility
 
-### Step 2: Insert all 42 questions
-Use the `admin-questions` edge function with `bulk_insert` in batches:
-1. **Math M1-M16** (16 questions) — standalone, `passage_id: null`
-2. **Logic L1-L5** (5 questions) — standalone, `passage_id: null`
-3. **Logic L6-L10** (5 questions) — with `passage_id` set to the UUID from Step 1, `passage_order` 1-5
-4. **Physics P1-P10** (10 questions) — standalone, `passage_id: null`
-5. **Technical T1-T6** (6 questions) — standalone, `passage_id: null`
+### Technical Details
 
-Total: 42 questions (complete SET_01).
+**Color HSL conversions:**
+| Color | HEX | HSL |
+|-------|-----|-----|
+| Soft Charcoal (text) | #2A2A2A | 0 0% 16.5% |
+| Warm Amber | #F5A623 | 37 91% 55% |
+| Button green | #2BB673 | 152 61% 44% |
+| Button green hover | #249E62 | 152 61% 38% |
 
-### Authentication requirement
-The `admin-questions` edge function requires an admin user's auth token. The user must be logged in as an admin in the preview for the `curl_edge_functions` tool to work (it auto-includes the auth token).
-
-If the user is not logged in as admin, I'll fall back to using a database migration to INSERT the data directly via SQL.
-
-### No code changes needed
-All data goes into existing tables via existing edge functions or SQL. No frontend or schema changes required.
-
+**Button variant mapping:**
+- `default` = Primary CTA (outlined, transparent bg)
+- `secondary` = Secondary CTA (green filled)
+- `ghost` = Cancel/Skip (text only, no border)
