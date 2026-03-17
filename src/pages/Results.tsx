@@ -189,7 +189,7 @@ const Results = () => {
                         <span className="text-sm font-medium">Q{q.question_order}</span>
                       </div>
 
-                      <p className="mb-4 text-sm font-medium">{q.question_text_en}</p>
+                      <p className="mb-4 text-sm font-medium"><MathText text={q.question_text_en} /></p>
 
                       {/* Options with highlighting */}
                       <div className="space-y-1.5">
