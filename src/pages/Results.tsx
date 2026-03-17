@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Lock, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import MathText from "@/components/MathText";
 
 interface ReviewQuestion {
   eaa_id: string;

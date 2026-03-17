@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Upload, RefreshCw } from "lucide-react";
+import MathText from "@/components/MathText";
 
 interface AdminQuestion {
   id: string;

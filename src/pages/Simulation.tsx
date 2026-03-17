@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Flag, Send, Lock, ChevronLast } from "lucide-react";
+import MathText from "@/components/MathText";
 
 interface ExamQuestion {
   eaa_id: string;
