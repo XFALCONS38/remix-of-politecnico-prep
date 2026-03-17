@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, Flag, Send, Lock, ChevronLast } from "lucide-react";
+import MathText from "@/components/MathText";
 
 interface ExamQuestion {
   eaa_id: string;
@@ -365,7 +366,7 @@ const Simulation = () => {
                   <CardContent className="p-6">
                     <p className="mb-2 text-xs font-medium text-muted-foreground uppercase">Reading Passage</p>
                     <div className="prose prose-sm max-w-none text-foreground whitespace-pre-wrap">
-                      {currentPassage}
+                      <MathText text={currentPassage} />
                     </div>
                   </CardContent>
                 </Card>
@@ -401,7 +402,7 @@ const Simulation = () => {
                   </div>
 
                   <p className="mb-6 text-lg font-medium leading-relaxed">
-                    {currentQuestion.question_text_en}
+                    <MathText text={currentQuestion.question_text_en} />
                   </p>
 
                   <div className="space-y-2">
@@ -430,7 +431,7 @@ const Simulation = () => {
                           >
                             {letter}
                           </span>
-                          <span>{text}</span>
+                          <span><MathText text={text} /></span>
                         </button>
                       );
                     })}

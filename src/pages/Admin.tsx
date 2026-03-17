@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Upload, RefreshCw } from "lucide-react";
+import MathText from "@/components/MathText";
 
 interface AdminQuestion {
   id: string;
@@ -223,7 +224,7 @@ const Admin = () => {
                             onCheckedChange={() => toggleActive(q.id, q.is_active)}
                           />
                         </td>
-                        <td className="py-2 text-xs max-w-xs truncate">{q.question_text_en}</td>
+                        <td className="py-2 text-xs max-w-xs truncate"><MathText text={q.question_text_en} /></td>
                       </tr>
                     ))}
                   </tbody>

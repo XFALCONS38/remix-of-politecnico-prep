@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Lock, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import MathText from "@/components/MathText";
 
 interface ReviewQuestion {
   eaa_id: string;
@@ -173,7 +174,7 @@ const Results = () => {
                       {q.passage_text_en && i === 0 && (
                         <div className="mb-4 rounded bg-muted/30 p-4">
                           <p className="mb-1 text-xs font-medium text-muted-foreground uppercase">Reading Passage</p>
-                          <p className="text-sm whitespace-pre-wrap">{q.passage_text_en}</p>
+                          <p className="text-sm whitespace-pre-wrap"><MathText text={q.passage_text_en} /></p>
                         </div>
                       )}
 
@@ -188,7 +189,7 @@ const Results = () => {
                         <span className="text-sm font-medium">Q{q.question_order}</span>
                       </div>
 
-                      <p className="mb-4 text-sm font-medium">{q.question_text_en}</p>
+                      <p className="mb-4 text-sm font-medium"><MathText text={q.question_text_en} /></p>
 
                       {/* Options with highlighting */}
                       <div className="space-y-1.5">
@@ -216,7 +217,7 @@ const Results = () => {
                               )}>
                                 {letter}
                               </span>
-                              <span>{text}</span>
+                              <span><MathText text={text} /></span>
                             </div>
                           );
                         })}
@@ -226,7 +227,7 @@ const Results = () => {
                       {hasPaidAccess && q.solution_en && (
                         <div className="mt-4 rounded bg-muted/30 p-3">
                           <p className="mb-1 text-xs font-medium text-muted-foreground">Solution</p>
-                          <p className="text-sm whitespace-pre-wrap">{q.solution_en}</p>
+                          <p className="text-sm whitespace-pre-wrap"><MathText text={q.solution_en} /></p>
                         </div>
                       )}
 
