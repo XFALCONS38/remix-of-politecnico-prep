@@ -402,7 +402,7 @@ const Simulation = () => {
                   </div>
 
                   <p className="mb-6 text-lg font-medium leading-relaxed">
-                    {currentQuestion.question_text_en}
+                    <MathText text={currentQuestion.question_text_en} />
                   </p>
 
                   <div className="space-y-2">
