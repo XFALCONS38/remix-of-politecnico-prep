@@ -366,7 +366,7 @@ const Simulation = () => {
                   <CardContent className="p-6">
                     <p className="mb-2 text-xs font-medium text-muted-foreground uppercase">Reading Passage</p>
                     <div className="prose prose-sm max-w-none text-foreground whitespace-pre-wrap">
-                      {currentPassage}
+                      <MathText text={currentPassage} />
                     </div>
                   </CardContent>
                 </Card>
