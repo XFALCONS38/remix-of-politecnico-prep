@@ -174,7 +174,7 @@ const Results = () => {
                       {q.passage_text_en && i === 0 && (
                         <div className="mb-4 rounded bg-muted/30 p-4">
                           <p className="mb-1 text-xs font-medium text-muted-foreground uppercase">Reading Passage</p>
-                          <p className="text-sm whitespace-pre-wrap">{q.passage_text_en}</p>
+                          <p className="text-sm whitespace-pre-wrap"><MathText text={q.passage_text_en} /></p>
                         </div>
                       )}
 
