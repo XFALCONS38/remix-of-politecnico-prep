@@ -217,7 +217,7 @@ const Results = () => {
                               )}>
                                 {letter}
                               </span>
-                              <span>{text}</span>
+                              <span><MathText text={text} /></span>
                             </div>
                           );
                         })}
