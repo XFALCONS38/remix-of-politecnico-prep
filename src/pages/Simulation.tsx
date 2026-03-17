@@ -431,7 +431,7 @@ const Simulation = () => {
                           >
                             {letter}
                           </span>
-                          <span>{text}</span>
+                          <span><MathText text={text} /></span>
                         </button>
                       );
                     })}

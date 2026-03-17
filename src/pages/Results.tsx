@@ -227,7 +227,7 @@ const Results = () => {
                       {hasPaidAccess && q.solution_en && (
                         <div className="mt-4 rounded bg-muted/30 p-3">
                           <p className="mb-1 text-xs font-medium text-muted-foreground">Solution</p>
-                          <p className="text-sm whitespace-pre-wrap">{q.solution_en}</p>
+                          <p className="text-sm whitespace-pre-wrap"><MathText text={q.solution_en} /></p>
                         </div>
                       )}
 
