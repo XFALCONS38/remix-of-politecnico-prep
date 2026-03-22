@@ -54,20 +54,20 @@ serve(async (req) => {
     const questionIds = eaas.map((e: any) => e.question_id);
     const { data: questions } = await supabase
       .from("questions")
-      .select("id, question_text_en, solution_en, section, topic, passage_id")
+      .select("id, question_text_en, question_text_it, solution_en, solution_it, section, topic, passage_id")
       .in("id", questionIds);
 
     const qMap = new Map((questions || []).map((q: any) => [q.id, q]));
 
     // Get passages
     const passageIds = [...new Set((questions || []).filter((q: any) => q.passage_id).map((q: any) => q.passage_id))];
-    const passageMap = new Map<string, string>();
+    const passageMap = new Map<string, { en: string; it: string | null }>();
     if (passageIds.length > 0) {
       const { data: passages } = await supabase
         .from("passages")
-        .select("id, passage_text_en")
+        .select("id, passage_text_en, passage_text_it")
         .in("id", passageIds);
-      (passages || []).forEach((p: any) => passageMap.set(p.id, p.passage_text_en));
+      (passages || []).forEach((p: any) => passageMap.set(p.id, { en: p.passage_text_en, it: p.passage_text_it }));
     }
 
     // Check if user has paid access
@@ -82,18 +82,22 @@ serve(async (req) => {
     // Build review data
     const reviewQuestions = eaas.map((eaa: any) => {
       const q = qMap.get(eaa.question_id);
+      const passage = q?.passage_id ? passageMap.get(q.passage_id) : null;
       return {
         eaa_id: eaa.id,
         question_id: eaa.question_id,
         section: eaa.section,
         question_order: eaa.question_order,
         question_text_en: q?.question_text_en ?? "",
+        question_text_it: q?.question_text_it ?? null,
         topic: q?.topic ?? "",
-        passage_text_en: q?.passage_id ? passageMap.get(q.passage_id) ?? null : null,
+        passage_text_en: passage?.en ?? null,
+        passage_text_it: passage?.it ?? null,
         options: eaa.options_snapshot,
         assigned_letter: eaa.assigned_letter,
         student_answer: eaa.student_answer,
         solution_en: hasPaidAccess ? (q?.solution_en ?? "") : null,
+        solution_it: hasPaidAccess ? (q?.solution_it ?? null) : null,
       };
     });
 

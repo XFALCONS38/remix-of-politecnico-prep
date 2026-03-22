@@ -70,17 +70,17 @@ function assembleAnswers(question: any) {
   const wrongPicks = pickRandom(wrongAnswers, 4);
 
   const allOptions = [
-    { text: correctPick.text_en, isCorrect: true },
-    ...wrongPicks.map((w: any) => ({ text: w.text_en, isCorrect: false })),
+    { en: correctPick.text_en, it: correctPick.text_it ?? null, isCorrect: true },
+    ...wrongPicks.map((w: any) => ({ en: w.text_en, it: w.text_it ?? null, isCorrect: false })),
   ];
 
   const shuffled = shuffle(allOptions);
   const letters = ["A", "B", "C", "D", "E"];
-  const optionsSnapshot: Record<string, string> = {};
+  const optionsSnapshot: Record<string, { en: string; it: string | null }> = {};
   let assignedLetter = "";
 
   shuffled.forEach((opt, i) => {
-    optionsSnapshot[letters[i]] = opt.text;
+    optionsSnapshot[letters[i]] = { en: opt.en, it: opt.it };
     if (opt.isCorrect) assignedLetter = letters[i];
   });
 
@@ -112,9 +112,11 @@ serve(async (req) => {
 
     // Parse body
     let isFree = true;
+    let lang = "en";
     try {
       const body = await req.json();
       isFree = body?.is_free ?? true;
+      lang = body?.lang ?? "en";
     } catch {
       // default free
     }
@@ -142,30 +144,33 @@ serve(async (req) => {
       const questionIds = eaas.map((e: any) => e.question_id);
       const { data: questions } = await supabase
         .from("questions")
-        .select("id, question_text_en, passage_id")
+        .select("id, question_text_en, question_text_it, passage_id")
         .in("id", questionIds);
 
       const qMap = new Map((questions || []).map((q: any) => [q.id, q]));
 
       const passageIds = [...new Set((questions || []).filter((q: any) => q.passage_id).map((q: any) => q.passage_id))];
-      const passageMap = new Map<string, string>();
+      const passageMap = new Map<string, { en: string; it: string | null }>();
       if (passageIds.length > 0) {
         const { data: passages } = await supabase
           .from("passages")
-          .select("id, passage_text_en")
+          .select("id, passage_text_en, passage_text_it")
           .in("id", passageIds);
-        (passages || []).forEach((p: any) => passageMap.set(p.id, p.passage_text_en));
+        (passages || []).forEach((p: any) => passageMap.set(p.id, { en: p.passage_text_en, it: p.passage_text_it }));
       }
 
       const responseQuestions = eaas.map((eaa: any) => {
         const q = qMap.get(eaa.question_id);
+        const passage = q?.passage_id ? passageMap.get(q.passage_id) : null;
         return {
           eaa_id: eaa.id,
           question_id: eaa.question_id,
           section: eaa.section,
           question_order: eaa.question_order,
           question_text_en: q?.question_text_en ?? "",
-          passage_text_en: q?.passage_id ? passageMap.get(q.passage_id) ?? null : null,
+          question_text_it: q?.question_text_it ?? null,
+          passage_text_en: passage?.en ?? null,
+          passage_text_it: passage?.it ?? null,
           options: eaa.options_snapshot,
           student_answer: eaa.student_answer,
         };
@@ -248,7 +253,6 @@ serve(async (req) => {
       const targetHard = count - targetMedium;
       const result: any[] = [];
 
-      // Fill medium from unseen then seen
       let mNeeded = targetMedium;
       for (const q of shuffle(unseen.filter((q: any) => q.difficulty === "medium"))) {
         if (mNeeded <= 0) break;
@@ -259,7 +263,6 @@ serve(async (req) => {
         result.push(q); mNeeded--;
       }
 
-      // Fill hard
       let hNeeded = targetHard;
       for (const q of shuffle(unseen.filter((q: any) => q.difficulty === "hard"))) {
         if (hNeeded <= 0 || result.find((r: any) => r.id === q.id)) continue;
@@ -270,7 +273,6 @@ serve(async (req) => {
         result.push(q); hNeeded--;
       }
 
-      // Fill remaining with any available
       if (result.length < count) {
         const remaining = [...unseen, ...seen].filter((q: any) => !result.find((r: any) => r.id === q.id));
         for (const q of shuffle(remaining)) {
@@ -285,7 +287,8 @@ serve(async (req) => {
 
     // Handle passage block for text_comprehension
     let passageBlock: any[] = [];
-    let passageText: string | null = null;
+    let passageTextEn: string | null = null;
+    let passageTextIt: string | null = null;
 
     const tcQuestions = allQuestions.filter((q: any) =>
       q.section === "logic" && q.topic === "text_comprehension" && q.passage_id
@@ -316,13 +319,13 @@ serve(async (req) => {
 
       const { data: passage } = await supabase
         .from("passages")
-        .select("passage_text_en")
+        .select("passage_text_en, passage_text_it")
         .eq("id", selectedPassageId)
         .single();
-      passageText = passage?.passage_text_en ?? null;
+      passageTextEn = passage?.passage_text_en ?? null;
+      passageTextIt = passage?.passage_text_it ?? null;
     }
 
-    // Expected totals per section
     const SECTION_TOTALS: Record<string, number> = {
       mathematics: 16,
       logic: 10,
@@ -330,9 +333,8 @@ serve(async (req) => {
       technical: 6,
     };
 
-    // Build ordered question list
     let questionOrder = 1;
-    const orderedQuestions: Array<{ question: any; section: string; order: number; passageText?: string }> = [];
+    const orderedQuestions: Array<{ question: any; section: string; order: number; passageTextEn?: string; passageTextIt?: string | null }> = [];
     const sections = ["mathematics", "logic", "physics", "technical"];
 
     for (const section of sections) {
@@ -341,7 +343,7 @@ serve(async (req) => {
       for (const slot of quotas) {
         if (slot.topics.includes("text_comprehension")) {
           for (const q of passageBlock) {
-            orderedQuestions.push({ question: q, section, order: questionOrder++, passageText: passageText ?? undefined });
+            orderedQuestions.push({ question: q, section, order: questionOrder++, passageTextEn: passageTextEn ?? undefined, passageTextIt: passageTextIt });
           }
           continue;
         }
@@ -351,11 +353,9 @@ serve(async (req) => {
         }
       }
 
-      // Fill any shortfall from remaining unused questions in this section
       const sectionCount = orderedQuestions.length - sectionStart;
       const expectedTotal = SECTION_TOTALS[section] ?? sectionCount;
       if (sectionCount < expectedTotal) {
-        const deficit = expectedTotal - sectionCount;
         const remaining = allQuestions.filter((q: any) =>
           q.section === section && !usedIds.has(q.id)
         );
@@ -427,7 +427,6 @@ serve(async (req) => {
     }
 
     // Build response
-    const eaaMap = new Map((insertedEaas || []).map((e: any) => [e.question_id + "_" + e.question_order, e]));
     const responseQuestions = orderedQuestions.map(oq => {
       const eaa = (insertedEaas || []).find((e: any) => e.question_id === oq.question.id && e.question_order === oq.order);
       return {
@@ -436,7 +435,9 @@ serve(async (req) => {
         section: oq.section,
         question_order: oq.order,
         question_text_en: oq.question.question_text_en,
-        passage_text_en: oq.passageText ?? null,
+        question_text_it: oq.question.question_text_it ?? null,
+        passage_text_en: oq.passageTextEn ?? null,
+        passage_text_it: oq.passageTextIt ?? null,
         options: eaa?.options_snapshot,
         student_answer: null,
       };
