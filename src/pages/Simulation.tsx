@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Flag, Send, Lock, ChevronLast } from "lucide-react";
+import { ChevronLeft, ChevronRight, Flag, Send, Lock, ChevronLast, Globe } from "lucide-react";
 import MathText from "@/components/MathText";
 
 interface ExamQuestion {
@@ -15,16 +15,20 @@ interface ExamQuestion {
   section: string;
   question_order: number;
   question_text_en: string;
+  question_text_it: string | null;
   passage_text_en: string | null;
-  options: Record<string, string>;
+  passage_text_it: string | null;
+  options: Record<string, string | { en: string; it: string | null }>;
   student_answer: string | null;
 }
 
-const SECTION_LABELS: Record<string, string> = {
-  mathematics: "Mathematics",
-  logic: "Comprehension & Logic",
-  physics: "Physics",
-  technical: "Technical Knowledge",
+type Lang = "en" | "it";
+
+const SECTION_LABELS: Record<string, Record<Lang, string>> = {
+  mathematics: { en: "Mathematics", it: "Matematica" },
+  logic: { en: "Comprehension & Logic", it: "Comprensione e Logica" },
+  physics: { en: "Physics", it: "Fisica" },
+  technical: { en: "Technical Knowledge", it: "Conoscenze Tecniche" },
 };
 
 const SECTION_ORDER = ["mathematics", "logic", "physics", "technical"];
@@ -36,15 +40,35 @@ const SECTION_TIMES: Record<string, number> = {
   technical: 12 * 60,
 };
 
+function getOptionText(opt: string | { en: string; it: string | null }, lang: Lang): string {
+  if (typeof opt === "string") return opt;
+  return (lang === "it" && opt.it) ? opt.it : opt.en;
+}
+
+function getQuestionText(q: ExamQuestion, lang: Lang): string {
+  if (lang === "it" && q.question_text_it) return q.question_text_it;
+  return q.question_text_en;
+}
+
+function getPassageText(q: ExamQuestion, lang: Lang): string | null {
+  if (lang === "it" && q.passage_text_it) return q.passage_text_it;
+  return q.passage_text_en;
+}
+
+function getSectionLabel(section: string, lang: Lang): string {
+  return SECTION_LABELS[section]?.[lang] ?? section;
+}
+
 const Simulation = () => {
   const { user, hasActiveAccess } = useAuth();
   const navigate = useNavigate();
 
+  const [lang, setLang] = useState<Lang | null>(null);
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<ExamQuestion[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [flagged, setFlagged] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,7 +82,7 @@ const Simulation = () => {
   const sectionGroups = SECTION_ORDER.map((section, idx) => ({
     section,
     idx,
-    label: SECTION_LABELS[section],
+    label: getSectionLabel(section, lang ?? "en"),
     questions: questions.filter((q) => q.section === section),
   })).filter((g) => g.questions.length > 0);
 
@@ -70,6 +94,7 @@ const Simulation = () => {
 
   // Arrow key + number key navigation (within current section only)
   useEffect(() => {
+    if (!lang) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const globalIndices = activeSectionQuestions.map((q) =>
         questions.findIndex((gq) => gq.eaa_id === q.eaa_id)
@@ -91,15 +116,16 @@ const Simulation = () => {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentIdx, questions, activeSectionIdx]);
+  }, [currentIdx, questions, activeSectionIdx, lang]);
 
-  // Load exam
+  // Load exam when language is selected
   useEffect(() => {
-    if (!user) return;
+    if (!user || !lang) return;
+    setLoading(true);
     const load = async () => {
       try {
         const { data, error: fnError } = await supabase.functions.invoke("generate-exam", {
-          body: { is_free: !hasActiveAccess },
+          body: { is_free: !hasActiveAccess, lang },
         });
 
         if (fnError) throw new Error(fnError.message);
@@ -112,7 +138,6 @@ const Simulation = () => {
         if (data.resumed) {
           const firstUnanswered = data.questions.findIndex((q: ExamQuestion) => !q.student_answer);
           if (firstUnanswered >= 0) {
-            // Determine which section that question belongs to
             const resumeSection = data.questions[firstUnanswered].section;
             const sectionIdx = SECTION_ORDER.indexOf(resumeSection);
             if (sectionIdx > 0) {
@@ -133,7 +158,7 @@ const Simulation = () => {
       }
     };
     load();
-  }, [user, hasActiveAccess]);
+  }, [user, hasActiveAccess, lang]);
 
   // Per-section timer
   useEffect(() => {
@@ -158,17 +183,20 @@ const Simulation = () => {
     const nextIdx = activeSectionIdx + 1;
     if (auto) {
       toast({
-        title: `Time's up for ${SECTION_LABELS[SECTION_ORDER[activeSectionIdx]]}!`,
+        title: lang === "it"
+          ? `Tempo scaduto per ${getSectionLabel(SECTION_ORDER[activeSectionIdx], "it")}!`
+          : `Time's up for ${getSectionLabel(SECTION_ORDER[activeSectionIdx], "en")}!`,
         description: nextIdx < SECTION_ORDER.length
-          ? `Moving to ${SECTION_LABELS[SECTION_ORDER[nextIdx]]}.`
-          : "Submitting your exam...",
+          ? (lang === "it"
+            ? `Passaggio a ${getSectionLabel(SECTION_ORDER[nextIdx], "it")}.`
+            : `Moving to ${getSectionLabel(SECTION_ORDER[nextIdx], "en")}.`)
+          : (lang === "it" ? "Consegna dell'esame..." : "Submitting your exam..."),
       });
     }
 
     setCompletedSections((prev) => new Set([...prev, activeSectionIdx]));
 
     if (nextIdx >= SECTION_ORDER.length) {
-      // Last section done — submit
       handleSubmit(true);
       return;
     }
@@ -177,11 +205,10 @@ const Simulation = () => {
     setSectionStartedAt(new Date());
     setSectionTimeLeft(SECTION_TIMES[SECTION_ORDER[nextIdx]]);
 
-    // Jump to first question of next section
     const nextSection = SECTION_ORDER[nextIdx];
     const firstQ = questions.findIndex((q) => q.section === nextSection);
     if (firstQ >= 0) setCurrentIdx(firstQ);
-  }, [activeSectionIdx, questions]);
+  }, [activeSectionIdx, questions, lang]);
 
   // Save answer
   const saveAnswer = useCallback(async (eaaId: string, letter: string | null) => {
@@ -195,10 +222,6 @@ const Simulation = () => {
   const handleSubmit = async (auto = false) => {
     if (!attemptId || submitting) return;
     setSubmitting(true);
-
-    if (auto && activeSectionIdx >= SECTION_ORDER.length - 1) {
-      toast({ title: "Exam complete!", description: "Your exam has been automatically submitted." });
-    }
 
     const { data, error: fnError } = await supabase.functions.invoke("score-attempt", {
       body: { attempt_id: attemptId },
@@ -221,11 +244,46 @@ const Simulation = () => {
     });
   };
 
-  if (loading) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Preparing your exam...</div>;
+  // Language selection screen
+  if (!lang) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center gap-6 p-8">
+            <Globe className="h-12 w-12 text-primary" />
+            <h2 className="text-2xl font-bold text-foreground">Choose Your Language</h2>
+            <p className="text-center text-sm text-muted-foreground">
+              Select the language for your exam. This cannot be changed once the exam starts.
+            </p>
+            <div className="flex w-full gap-4">
+              <Button
+                className="flex-1"
+                variant="outline"
+                size="lg"
+                onClick={() => setLang("en")}
+              >
+                🇬🇧 English
+              </Button>
+              <Button
+                className="flex-1"
+                variant="outline"
+                size="lg"
+                onClick={() => setLang("it")}
+              >
+                🇮🇹 Italiano
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">{lang === "it" ? "Preparazione dell'esame..." : "Preparing your exam..."}</div>;
   if (error) return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4">
       <p className="text-destructive">{error}</p>
-      <Button onClick={() => navigate("/dashboard")}>Back to Dashboard</Button>
+      <Button onClick={() => navigate("/dashboard")}>{lang === "it" ? "Torna alla Dashboard" : "Back to Dashboard"}</Button>
     </div>
   );
 
@@ -236,7 +294,6 @@ const Simulation = () => {
 
   const answeredInSection = activeSectionQuestions.filter((q) => q.student_answer).length;
 
-  // Navigation helpers within current section
   const globalIndices = activeSectionQuestions.map((q) =>
     questions.findIndex((gq) => gq.eaa_id === q.eaa_id)
   );
@@ -244,7 +301,7 @@ const Simulation = () => {
   const canGoPrev = posInSection > 0;
   const canGoNext = posInSection < globalIndices.length - 1;
 
-  const currentPassage = currentQuestion?.passage_text_en;
+  const currentPassage = currentQuestion ? getPassageText(currentQuestion, lang) : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -253,10 +310,10 @@ const Simulation = () => {
         <div className="container flex h-14 items-center justify-between">
           <div className="flex items-center gap-4">
             <span className="text-sm font-medium">
-              {SECTION_LABELS[activeSection] ?? "Exam"}
+              {getSectionLabel(activeSection, lang)}
             </span>
             <span className="text-xs text-muted-foreground">
-              {answeredInSection}/{activeSectionQuestions.length} answered
+              {answeredInSection}/{activeSectionQuestions.length} {lang === "it" ? "risposte" : "answered"}
             </span>
           </div>
           <div className={cn("text-2xl font-mono font-bold tabular-nums", timerColor)}>
@@ -271,12 +328,12 @@ const Simulation = () => {
                 className="gap-1"
               >
                 <ChevronLast className="h-3.5 w-3.5" />
-                Next Section
+                {lang === "it" ? "Sezione Successiva" : "Next Section"}
               </Button>
             ) : (
               <Button size="sm" onClick={() => handleSubmit(false)} disabled={submitting} className="gap-1">
                 <Send className="h-3.5 w-3.5" />
-                {submitting ? "Submitting..." : "Submit Exam"}
+                {submitting ? (lang === "it" ? "Invio..." : "Submitting...") : (lang === "it" ? "Consegna Esame" : "Submit Exam")}
               </Button>
             )}
           </div>
@@ -320,7 +377,7 @@ const Simulation = () => {
         <div className="hidden w-52 shrink-0 md:block">
           <div className="sticky top-28 space-y-4">
             <p className="mb-2 text-xs font-medium text-muted-foreground uppercase">
-              {SECTION_LABELS[activeSection]}
+              {getSectionLabel(activeSection, lang)}
             </p>
             <div className="grid grid-cols-5 gap-1.5">
               {activeSectionQuestions.map((q, i) => {
@@ -345,13 +402,13 @@ const Simulation = () => {
             </div>
             <div className="mt-4 space-y-1 text-xs text-muted-foreground">
               <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded bg-primary" /> Answered
+                <div className="h-3 w-3 rounded bg-primary" /> {lang === "it" ? "Risposta data" : "Answered"}
               </div>
               <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded bg-secondary" /> Unanswered
+                <div className="h-3 w-3 rounded bg-secondary" /> {lang === "it" ? "Senza risposta" : "Unanswered"}
               </div>
               <div className="flex items-center gap-2">
-                <div className="h-3 w-3 rounded ring-2 ring-warning" /> Flagged
+                <div className="h-3 w-3 rounded ring-2 ring-warning" /> {lang === "it" ? "Contrassegnata" : "Flagged"}
               </div>
             </div>
           </div>
@@ -364,7 +421,9 @@ const Simulation = () => {
               {currentPassage && (
                 <Card className="mb-4">
                   <CardContent className="p-6">
-                    <p className="mb-2 text-xs font-medium text-muted-foreground uppercase">Reading Passage</p>
+                    <p className="mb-2 text-xs font-medium text-muted-foreground uppercase">
+                      {lang === "it" ? "Brano di Lettura" : "Reading Passage"}
+                    </p>
                     <div className="prose prose-sm max-w-none text-foreground whitespace-pre-wrap">
                       <MathText text={currentPassage} />
                     </div>
@@ -376,7 +435,9 @@ const Simulation = () => {
                 <CardContent className="p-6">
                   <div className="mb-6 flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">
-                      Question {posInSection + 1} of {activeSectionQuestions.length}
+                      {lang === "it"
+                        ? `Domanda ${posInSection + 1} di ${activeSectionQuestions.length}`
+                        : `Question ${posInSection + 1} of ${activeSectionQuestions.length}`}
                     </span>
                     <div className="flex items-center gap-2">
                       {currentQuestion.student_answer && (
@@ -386,7 +447,7 @@ const Simulation = () => {
                           onClick={() => saveAnswer(currentQuestion.eaa_id, null)}
                           className="text-xs text-muted-foreground"
                         >
-                          Clear
+                          {lang === "it" ? "Cancella" : "Clear"}
                         </Button>
                       )}
                       <Button
@@ -396,19 +457,22 @@ const Simulation = () => {
                         className="gap-1"
                       >
                         <Flag className="h-3.5 w-3.5" />
-                        {flagged.has(currentQuestion.eaa_id) ? "Flagged" : "Flag"}
+                        {flagged.has(currentQuestion.eaa_id)
+                          ? (lang === "it" ? "Contrassegnata" : "Flagged")
+                          : (lang === "it" ? "Segna" : "Flag")}
                       </Button>
                     </div>
                   </div>
 
                   <p className="mb-6 text-lg font-medium leading-relaxed">
-                    <MathText text={currentQuestion.question_text_en} />
+                    <MathText text={getQuestionText(currentQuestion, lang)} />
                   </p>
 
                   <div className="space-y-2">
                     {["A", "B", "C", "D", "E"].map((letter) => {
-                      const text = currentQuestion.options[letter];
-                      if (!text) return null;
+                      const optVal = currentQuestion.options[letter];
+                      if (!optVal) return null;
+                      const text = getOptionText(optVal, lang);
                       const isSelected = currentQuestion.student_answer === letter;
                       return (
                         <button
@@ -443,13 +507,13 @@ const Simulation = () => {
                       disabled={!canGoPrev}
                       onClick={() => setCurrentIdx(globalIndices[posInSection - 1])}
                     >
-                      <ChevronLeft className="mr-1 h-4 w-4" /> Previous
+                      <ChevronLeft className="mr-1 h-4 w-4" /> {lang === "it" ? "Precedente" : "Previous"}
                     </Button>
                     <Button
                       disabled={!canGoNext}
                       onClick={() => setCurrentIdx(globalIndices[posInSection + 1])}
                     >
-                      Next <ChevronRight className="ml-1 h-4 w-4" />
+                      {lang === "it" ? "Successiva" : "Next"} <ChevronRight className="ml-1 h-4 w-4" />
                     </Button>
                   </div>
                 </CardContent>
