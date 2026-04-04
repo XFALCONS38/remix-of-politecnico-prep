@@ -1,54 +1,46 @@
 
 
-# Update SET_01 with Bilingual Data + Add Language Selection
+# Fix Bilingual Options & LaTeX Rendering in Exam
 
-## Summary
-Replace all 42 SET_01 questions with LaTeX-formatted bilingual versions (EN+IT), update the passage with Italian translation, modify edge functions to support bilingual `options_snapshot`, and add a language selector before exam start.
+## Problems Identified
 
-## Step 1: Database — Update all SET_01 data via SQL
+1. **Options show English even when Italian is selected**: The `options_snapshot` stored in `exam_attempt_answers` contains plain strings like `{"A": "text"}` instead of bilingual objects `{"A": {"en": "...", "it": "..."}}`. The `generate-exam` edge function code already produces bilingual format, but it needs redeployment. Additionally, resumed attempts with old-format data will always show English.
 
-**One large UPDATE migration** that:
-- Updates all 42 questions with new `question_text_en` (LaTeX), `question_text_it`, `correct_answers` (with `text_it`), `wrong_answers` (with `text_it`), `solution_en` (LaTeX), `solution_it`, `it_ready = true` — matched by `question_code` + `set_id`
-- Updates the passage with `passage_text_it` and `it_ready = true`
+2. **LaTeX not rendering in answer options**: The `correct_answers` and `wrong_answers` JSONB fields in the `questions` table store double backslashes (`\\sqrt{7}`, `\\cup`) instead of single backslashes (`\sqrt{7}`, `\cup`). The `question_text_en/it` fields are correct with single backslashes. KaTeX requires single backslashes to render properly.
 
-Since UPDATE requires migrations, this will be a migration with 42 UPDATE statements + 1 passage UPDATE.
+## Fixes
 
-## Step 2: Edge Function — `generate-exam`
+### Step 1: Database Migration — Fix double backslashes in answer JSONB
 
-Modify `assembleAnswers()` to store bilingual options:
+Run a migration that replaces `\\` with `\` in all text values within `correct_answers` and `wrong_answers` JSONB for all questions in SET_01. This covers `text_en`, `text_it`, and `explanation_en` fields. Also fix `solution_en` and `solution_it` if they have the same issue.
+
+```sql
+-- Fix double backslashes in correct_answers and wrong_answers
+UPDATE questions
+SET
+  correct_answers = regexp_replace(correct_answers::text, '\\\\', '\', 'g')::jsonb,
+  wrong_answers = regexp_replace(wrong_answers::text, '\\\\', '\', 'g')::jsonb,
+  solution_en = regexp_replace(solution_en, '\\\\', '\', 'g'),
+  solution_it = regexp_replace(solution_it, '\\\\', '\', 'g')
+WHERE set_id = 'SET_01';
 ```
-// Current: {"A": "text_en", ...}
-// New:     {"A": {"en": "text_en", "it": "text_it"}, ...}
-```
 
-Accept `lang` param from request body. Return both `question_text_en` and `question_text_it` fields, plus `passage_text_it` for passage questions. Resume path also fetches `_it` fields.
+### Step 2: Redeploy `generate-exam` edge function
 
-## Step 3: Edge Function — `get-exam-review`
+The code already produces bilingual `options_snapshot`. Ensure it's deployed so new attempts get the correct format. (Edge functions auto-deploy on save in Lovable.)
 
-Fetch `question_text_it`, `solution_it`, `passage_text_it` from DB. Return them alongside English versions in the response.
+### Step 3: Frontend — Handle old attempts gracefully
 
-## Step 4: Frontend — `Simulation.tsx`
+The `getOptionText` helper in `Simulation.tsx` already handles both formats (string vs object). No frontend change needed for this.
 
-- Add a **language selection screen** before exam starts (two buttons: English / Italiano)
-- Store `lang` in state, pass to `generate-exam` call
-- Update `ExamQuestion` interface to include `question_text_it`, `passage_text_it`
-- Options rendering: check if option value is string (old) or object (new bilingual) — render `options[letter][lang]` or `options[letter]` accordingly
-- Italian section labels: `{ mathematics: "Matematica", logic: "Comprensione e Logica", physics: "Fisica", technical: "Conoscenze Tecniche" }`
+### Step 4: Clear any in-progress attempts with old format (optional)
 
-## Step 5: Frontend — `Results.tsx`
-
-- Update `ReviewQuestion` interface with `_it` fields
-- Add lang toggle or detect from options format
-- Render bilingual content based on language choice
-- Solution display uses `solution_it` when Italian selected
+If the user has an in-progress attempt with old-format options, it will resume with English-only options. The simplest fix: mark old in-progress attempts as abandoned so a fresh exam generates with the new bilingual format.
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| Migration SQL | UPDATE 42 questions + 1 passage with IT translations + LaTeX |
-| `supabase/functions/generate-exam/index.ts` | Bilingual `assembleAnswers`, accept `lang`, return `_it` fields |
-| `supabase/functions/get-exam-review/index.ts` | Return `_it` fields |
-| `src/pages/Simulation.tsx` | Language picker, bilingual rendering |
-| `src/pages/Results.tsx` | Bilingual review rendering |
+| Migration SQL | Fix `\\` → `\` in `correct_answers`, `wrong_answers`, `solution_en`, `solution_it` |
+| `supabase/functions/generate-exam/index.ts` | No code change needed — just redeploy |
 
