@@ -35,7 +35,7 @@ const Pricing = () => {
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="container flex h-16 items-center justify-between">
-          <Link to="/" className="text-xl font-bold tracking-tight"><Link to="/" className="text-xl font-bold tracking-tight">TILPrep</Link></Link>
+          <Link to="/" className="text-xl font-bold tracking-tight">TILPrep</Link>
           <nav className="flex gap-3">
             {user ? (
               <Link to="/dashboard"><Button variant="outline" size="sm">Dashboard</Button></Link>
