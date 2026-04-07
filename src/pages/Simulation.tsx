@@ -103,6 +103,14 @@ const Simulation = () => {
     (q) => q.eaa_id === questions[currentIdx]?.eaa_id
   );
 
+  // Save answer
+  const saveAnswer = useCallback(async (eaaId: string, letter: string | null) => {
+    setQuestions((prev) =>
+      prev.map((q) => (q.eaa_id === eaaId ? { ...q, student_answer: letter } : q))
+    );
+    await (supabase as any).from("exam_attempt_answers").update({ student_answer: letter }).eq("id", eaaId);
+  }, []);
+
   // Arrow key + number key navigation (within current section only)
   useEffect(() => {
     if (!lang) return;
@@ -223,13 +231,7 @@ const Simulation = () => {
     if (firstQ >= 0) setCurrentIdx(firstQ);
   }, [activeSectionIdx, questions, lang]);
 
-  // Save answer
-  const saveAnswer = useCallback(async (eaaId: string, letter: string | null) => {
-    setQuestions((prev) =>
-      prev.map((q) => (q.eaa_id === eaaId ? { ...q, student_answer: letter } : q))
-    );
-    await (supabase as any).from("exam_attempt_answers").update({ student_answer: letter }).eq("id", eaaId);
-  }, []);
+  // (saveAnswer moved above keyboard handler)
 
   // Submit exam
   const handleSubmit = async (auto = false) => {
