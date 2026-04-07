@@ -113,7 +113,7 @@ const Admin = () => {
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="container flex h-16 items-center justify-between">
-          <Link to="/" className="text-xl font-bold tracking-tight">PolitoSim — Admin</Link>
+          <Link to="/" className="text-xl font-bold tracking-tight"><Link to="/" className="text-xl font-bold tracking-tight">TILPrep — Admin</Link></Link>
           <Link to="/dashboard"><Button variant="outline" size="sm">Dashboard</Button></Link>
         </div>
       </header>

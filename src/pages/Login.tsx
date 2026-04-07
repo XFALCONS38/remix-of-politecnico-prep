@@ -30,7 +30,7 @@ const Login = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Sign In</CardTitle>
-          <CardDescription>Enter your credentials to access PolitoSim</CardDescription>
+          <CardDescription>Enter your credentials to access <CardDescription>Enter your credentials to access TILPrep</CardDescription></CardDescription>
         </CardHeader>
         <form onSubmit={handleLogin}>
           <CardContent className="space-y-4">

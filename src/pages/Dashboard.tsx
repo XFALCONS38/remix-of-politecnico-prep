@@ -32,7 +32,7 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="container flex h-16 items-center justify-between">
-          <Link to="/" className="text-xl font-bold tracking-tight">PolitoSim</Link>
+          <Link to="/" className="text-xl font-bold tracking-tight"><Link to="/" className="text-xl font-bold tracking-tight">TILPrep</Link></Link>
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground">{profile?.email}</span>
             <Button variant="ghost" size="sm" onClick={signOut}>Sign Out</Button>
