@@ -11,7 +11,7 @@ const Index = () => {
       {/* Nav */}
       <header className="border-b">
         <div className="container flex h-16 items-center justify-between">
-          <span className="text-xl font-bold tracking-tight">PolitoSim</span>
+          <span className="text-xl font-bold tracking-tight"><span className="text-xl font-bold tracking-tight">TILPrep</span></span>
           <nav className="flex gap-3">
             {user ? (
               <Link to="/dashboard">
