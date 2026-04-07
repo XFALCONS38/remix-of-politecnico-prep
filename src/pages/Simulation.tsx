@@ -271,23 +271,16 @@ const Simulation = () => {
               Select the language for your exam. This cannot be changed once the exam starts.
             </p>
             <div className="flex w-full gap-4">
-              <Button
-                className="flex-1"
-                variant="outline"
-                size="lg"
-                onClick={() => setLang("en")}
-              >
+              <Button className="flex-1" variant="outline" size="lg" onClick={() => setLang("en")}>
                 🇬🇧 English
               </Button>
-              <Button
-                className="flex-1"
-                variant="outline"
-                size="lg"
-                onClick={() => setLang("it")}
-              >
+              <Button className="flex-1" variant="outline" size="lg" onClick={() => setLang("it")}>
                 🇮🇹 Italiano
               </Button>
             </div>
+            <Link to="/dashboard" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <ArrowLeft className="h-3.5 w-3.5" /> Back to Dashboard
+            </Link>
           </CardContent>
         </Card>
       </div>
@@ -346,7 +339,7 @@ const Simulation = () => {
                 {lang === "it" ? "Sezione Successiva" : "Next Section"}
               </Button>
             ) : (
-              <Button size="sm" onClick={() => handleSubmit(false)} disabled={submitting} className="gap-1">
+              <Button size="sm" onClick={() => setShowSubmitDialog(true)} disabled={submitting} className="gap-1">
                 <Send className="h-3.5 w-3.5" />
                 {submitting ? (lang === "it" ? "Invio..." : "Submitting...") : (lang === "it" ? "Consegna Esame" : "Submit Exam")}
               </Button>
@@ -537,6 +530,38 @@ const Simulation = () => {
           )}
         </div>
       </div>
+
+      {/* Submit confirmation dialog */}
+      <AlertDialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {lang === "it" ? "Sei sicuro di voler consegnare?" : "Are you sure you want to submit?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const unanswered = questions.filter((q) => !q.student_answer).length;
+                if (unanswered > 0) {
+                  return lang === "it"
+                    ? `Hai ancora ${unanswered} domande senza risposta. Le domande senza risposta non riceveranno penalità ma nemmeno punti.`
+                    : `You still have ${unanswered} unanswered questions. Unanswered questions won't receive a penalty but won't earn points either.`;
+                }
+                return lang === "it"
+                  ? "Hai risposto a tutte le domande. Vuoi consegnare l'esame?"
+                  : "You've answered all questions. Ready to submit your exam?";
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {lang === "it" ? "Continua Esame" : "Continue Exam"}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleSubmit(false)}>
+              {lang === "it" ? "Consegna" : "Submit Anyway"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
