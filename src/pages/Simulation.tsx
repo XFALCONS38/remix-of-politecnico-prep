@@ -1,12 +1,22 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, Flag, Send, Lock, ChevronLast, Globe } from "lucide-react";
+import { ChevronLeft, ChevronRight, Flag, Send, Lock, ChevronLast, Globe, ArrowLeft } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import MathText from "@/components/MathText";
 
 interface ExamQuestion {
@@ -71,6 +81,7 @@ const Simulation = () => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showSubmitDialog, setShowSubmitDialog] = useState(false);
 
   // Kill-switch section state
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
@@ -102,8 +113,10 @@ const Simulation = () => {
       const posInSection = globalIndices.indexOf(currentIdx);
 
       if (e.key === "ArrowRight" && posInSection < globalIndices.length - 1) {
+        e.preventDefault();
         setCurrentIdx(globalIndices[posInSection + 1]);
       } else if (e.key === "ArrowLeft" && posInSection > 0) {
+        e.preventDefault();
         setCurrentIdx(globalIndices[posInSection - 1]);
       } else if (["1", "2", "3", "4", "5"].includes(e.key)) {
         const letters = ["A", "B", "C", "D", "E"];
@@ -116,7 +129,7 @@ const Simulation = () => {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentIdx, questions, activeSectionIdx, lang]);
+  }, [currentIdx, questions, activeSectionIdx, lang, activeSectionQuestions, saveAnswer]);
 
   // Load exam when language is selected
   useEffect(() => {
