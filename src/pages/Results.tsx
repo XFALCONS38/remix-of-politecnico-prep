@@ -134,7 +134,7 @@ const Results = () => {
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="container flex h-16 items-center justify-between">
-          <Link to="/" className="text-xl font-bold tracking-tight"><Link to="/" className="text-xl font-bold tracking-tight">TILPrep</Link></Link>
+          <Link to="/" className="text-xl font-bold tracking-tight">TILPrep</Link>
           <div className="flex gap-3">
             <Button
               variant="ghost"
