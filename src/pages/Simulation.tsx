@@ -150,7 +150,7 @@ const Simulation = () => {
     const load = async () => {
       try {
         const { data, error: fnError } = await supabase.functions.invoke("generate-exam", {
-          body: { is_free: !hasActiveAccess, lang },
+          body: { is_free: !hasActiveAccess, lang, set_id: selectedSet },
         });
 
         if (fnError) throw new Error(fnError.message);
