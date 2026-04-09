@@ -71,10 +71,12 @@ function getSectionLabel(section: string, lang: Lang): string {
 }
 
 const Simulation = () => {
-  const { user, hasActiveAccess } = useAuth();
+  const { user, hasActiveAccess, profile } = useAuth();
+  const { lang: uiLang } = useTheme();
   const navigate = useNavigate();
 
   const [lang, setLang] = useState<Lang | null>(null);
+  const [selectedSet, setSelectedSet] = useState<string>("SET_01");
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<ExamQuestion[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
