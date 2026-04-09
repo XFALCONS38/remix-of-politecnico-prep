@@ -1,95 +1,90 @@
 
 
-# Robust Student Dashboard + UX Fixes
+# Universal Theme, Language Preferences & Set Selection
 
-## Context
-Currently the Dashboard is a simple list of past attempts. The user wants a beautiful, feature-rich dashboard for pro students with analytics, plus several UX fixes across the app. The simulator itself should NOT be touched (except the submit confirmation and arrow key fix which are minimal behavioral changes in `Simulation.tsx`).
+## Summary
+Add dark/light mode toggle, a universal language preference (stored in profile), set selection before exam, and ensure Italian users always see native Italian content from the database — never translated.
 
-## What We're Building
+## Database Changes
 
-### A. New Dashboard (complete rewrite of `src/pages/Dashboard.tsx`)
-
-**Layout**: Responsive grid — sidebar-style nav on desktop, bottom/hamburger on mobile.
-
-```text
-┌──────────────────────────────────────────────────┐
-│  Header: TILPrep logo (→ home) | email | signout │
-├──────────────────────────────────────────────────┤
-│                                                  │
-│  Welcome back, [name/email]         [Start Sim]  │
-│  Pro access expires in X days                    │
-│                                                  │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌────────┐ │
-│  │ Total   │ │ Best    │ │ Avg     │ │ Exams  │ │
-│  │ Exams   │ │ Score   │ │ Score   │ │ This   │ │
-│  │   12    │ │  34.5   │ │  28.2   │ │ Week:3 │ │
-│  └─────────┘ └─────────┘ └─────────┘ └────────┘ │
-│                                                  │
-│  ┌── Score Progress Over Time ──────────────┐    │
-│  │  Simple line/bar chart of attempt scores │    │
-│  │  (pure CSS/SVG, no library needed)       │    │
-│  └──────────────────────────────────────────┘    │
-│                                                  │
-│  ┌── Section Strengths ────────────────────┐     │
-│  │  Math:     ████████░░  78%              │     │
-│  │  Logic:    ██████░░░░  55%              │     │
-│  │  Physics:  ████░░░░░░  40%  ← weakest  │     │
-│  │  Technical:███████░░░  65%              │     │
-│  └─────────────────────────────────────────┘     │
-│                                                  │
-│  ┌── Recent Attempts ──────────────────────┐     │
-│  │  Date | Score | Verdict | View/Continue │     │
-│  │  ...                                    │     │
-│  └─────────────────────────────────────────┘     │
-│                                                  │
-│  (Free users: upgrade banner stays)              │
-└──────────────────────────────────────────────────┘
+### Migration 1: Add columns to `profiles` and `attempts`
+```sql
+ALTER TABLE profiles ADD COLUMN preferred_lang TEXT DEFAULT 'en';
+ALTER TABLE attempts ADD COLUMN lang TEXT DEFAULT 'en';
+ALTER TABLE attempts ADD COLUMN set_id TEXT DEFAULT 'SET_01';
 ```
 
-**Stats cards** (top row): Total exams completed, Best score, Average score, Exams this week. Computed client-side from attempts data.
+- `preferred_lang` on profiles: persists the user's language choice across sessions
+- `lang` on attempts: records which language was used for each exam (so Results/Dashboard know which field to read)
+- `set_id` on attempts: records which question set was used
 
-**Score history chart**: A simple SVG-based mini chart showing score progression across attempts (no external charting library). Each bar/dot = one completed attempt.
+## Frontend Changes
 
-**Section strengths**: Aggregated from `section_scores` JSONB across all completed attempts. Shows average % per section with colored progress bars. Highlights weakest section.
+### 1. Theme & Language Context (`src/contexts/ThemeContext.tsx` — new)
+- Dark/light mode: stores in `localStorage`, applies `dark` class to `<html>`
+- Provides `theme`, `toggleTheme`, `lang`, `setLang` globally
+- `lang` syncs from `profile.preferred_lang` on login; updates profile in DB when changed
 
-**Attempt history table**: Same data as current but styled as a proper responsive table/card list. On mobile, each attempt becomes a stacked card.
+### 2. Tailwind dark mode (`tailwind.config.ts`)
+- Set `darkMode: "class"` (may already be set)
 
-**Upgrade banner**: Still shown for free users, hidden for pro.
+### 3. Universal Header Component (`src/components/SiteHeader.tsx` — new)
+- TILPrep logo → home link
+- Dark/light toggle (Sun/Moon icon)
+- Language toggle (EN/IT flag switch) — changes UI labels site-wide
+- Used on: Index, Dashboard, Pricing, Login, Register, Results pages
 
-**Responsive behavior**:
-- Desktop (≥768px): Grid layout, stats in a row, chart + strengths side by side
-- Tablet: Stats wrap to 2×2, chart full width
-- Mobile (<640px): Single column, cards stack vertically, touch-friendly tap targets (min 44px)
+### 4. Registration (`Register.tsx`)
+- Add language selector (EN/IT) during signup
+- Store chosen lang in profile via `preferred_lang`
 
-### B. Navigation Fixes
+### 5. Simulation pre-exam screen (`Simulation.tsx`)
+- Replace language-only selector with a combined screen:
+  - Language choice (pre-filled from profile preference)
+  - **Set selection**: Show available sets. Free users: only SET_01. Pro users: all sets (currently just SET_01, but extensible)
+  - "Start Exam" button
+- Pass `set_id` + `lang` to `generate-exam` edge function
+- Store `lang` and `set_id` on the attempt record
 
-1. **Login page** (`Login.tsx`): Add "← Back to Home" link or TILPrep logo linking to `/`
-2. **Register page** (`Register.tsx`): Same — add home link
-3. **Language selection screen** (`Simulation.tsx`, the `if (!lang)` block): Add a "← Back to Dashboard" button
-4. **Fix duplicate nested Link/span tags** in headers (visible in current code: `<Link><Link>TILPrep</Link></Link>`)
+### 6. Edge function: `generate-exam`
+- Accept `set_id` from body (default `SET_01`)
+- Use `set_id` to filter questions: `.eq("set_id", body.set_id)`
+- Store `lang` and `set_id` on the attempt row
+- Remove the old `is_free` → `SET_01` logic; instead directly use the passed `set_id`
 
-### C. Submit Confirmation Dialog
+### 7. Results page (`Results.tsx`)
+- Read `lang` from the attempt record (via `get-exam-review` response)
+- Use that lang to decide which field to display (`question_text_it` vs `question_text_en`, `solution_it` vs `solution_en`)
+- Remove the manual language toggle on Results — language is locked to what was used during the exam
+- The translator toggle in the header does NOT affect question/answer/solution text
 
-In `Simulation.tsx`, when the user manually clicks "Submit Exam":
-- Show an AlertDialog: "Are you sure you want to submit? You still have X unanswered questions."
-- Two buttons: "Continue Exam" (cancel) and "Submit Anyway" (confirm)
-- Auto-submit (timer expiry) skips this dialog
+### 8. Dashboard (`Dashboard.tsx`)
+- Section labels respect the global `lang` from context
+- Attempt history shows "View" links that load results in the exam's original language
+- All UI text (Welcome back, stats labels, etc.) translated based on global lang
 
-### D. Arrow Key Navigation Fix
-
-The current `useEffect` for keyboard handling already handles ArrowLeft/ArrowRight. Looking at the code, the issue is that `saveAnswer` is missing from the dependency array of the `useEffect`, and the handler references stale closures. We need to add `saveAnswer` to deps and also prevent default on arrow keys to avoid page scrolling.
+### 9. Language rules (critical)
+- **Exam content** (questions, options, solutions): ALWAYS uses the `lang` stored on the attempt. Never translated dynamically.
+- **UI chrome** (buttons, labels, navigation): Uses the global `lang` from ThemeContext, switchable anytime via header toggle.
+- The header language toggle explicitly does NOT affect exam content rendering.
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/pages/Dashboard.tsx` | Complete rewrite: stats cards, score chart (SVG), section strengths, responsive layout |
-| `src/pages/Login.tsx` | Add TILPrep logo/link to home at top; fix nested Link tags |
-| `src/pages/Register.tsx` | Add TILPrep logo/link to home at top |
-| `src/pages/Simulation.tsx` | (1) Add back button on language screen, (2) Add AlertDialog for submit confirmation, (3) Fix arrow key `e.preventDefault()` + deps |
-| `src/pages/Results.tsx` | Fix duplicate nested Link tags in header |
-| `src/pages/Pricing.tsx` | Fix duplicate nested Link tags in header |
-| `src/pages/Index.tsx` | Fix duplicate nested span tags in header |
-
-No database changes needed — all analytics are computed client-side from existing `attempts` table data (score, section_scores, started_at).
+| Migration SQL | Add `preferred_lang` to profiles, `lang` + `set_id` to attempts |
+| `tailwind.config.ts` | Ensure `darkMode: "class"` |
+| `src/contexts/ThemeContext.tsx` | New: dark mode + global UI lang provider |
+| `src/components/SiteHeader.tsx` | New: universal header with theme + lang toggles |
+| `src/App.tsx` | Wrap with ThemeProvider |
+| `src/pages/Index.tsx` | Use SiteHeader |
+| `src/pages/Dashboard.tsx` | Use SiteHeader, bilingual UI labels |
+| `src/pages/Login.tsx` | Use SiteHeader |
+| `src/pages/Register.tsx` | Use SiteHeader, add lang preference picker |
+| `src/pages/Pricing.tsx` | Use SiteHeader |
+| `src/pages/Simulation.tsx` | Combined lang + set picker pre-exam screen |
+| `src/pages/Results.tsx` | Lock content lang to attempt's lang, use SiteHeader |
+| `supabase/functions/generate-exam/index.ts` | Accept `set_id`, store `lang` + `set_id` on attempt |
+| `supabase/functions/get-exam-review/index.ts` | Return attempt `lang` in response |
+| `src/contexts/AuthContext.tsx` | Fetch `preferred_lang` in profile |
 
