@@ -262,27 +262,90 @@ const Simulation = () => {
     });
   };
 
-  // Language selection screen
+  // Language + Set selection screen
   if (!lang) {
+    const defaultLang = (profile as any)?.preferred_lang === "it" ? "it" : "en";
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center gap-6 p-8">
             <Globe className="h-12 w-12 text-primary" />
-            <h2 className="text-2xl font-bold text-foreground">Choose Your Language</h2>
-            <p className="text-center text-sm text-muted-foreground">
-              Select the language for your exam. This cannot be changed once the exam starts.
-            </p>
-            <div className="flex w-full gap-4">
-              <Button className="flex-1" variant="outline" size="lg" onClick={() => setLang("en")}>
-                🇬🇧 English
-              </Button>
-              <Button className="flex-1" variant="outline" size="lg" onClick={() => setLang("it")}>
-                🇮🇹 Italiano
-              </Button>
+            <h2 className="text-2xl font-bold text-foreground">
+              {uiLang === "it" ? "Configura il Tuo Esame" : "Configure Your Exam"}
+            </h2>
+
+            {/* Language */}
+            <div className="w-full">
+              <p className="mb-2 text-sm font-medium text-foreground">
+                {uiLang === "it" ? "Lingua dell'esame" : "Exam Language"}
+              </p>
+              <div className="flex w-full gap-3">
+                <Button
+                  className="flex-1"
+                  variant={selectedPreLang === "en" ? "default" : "outline"}
+                  size="lg"
+                  onClick={() => setSelectedPreLang("en")}
+                >
+                  🇬🇧 English
+                </Button>
+                <Button
+                  className="flex-1"
+                  variant={selectedPreLang === "it" ? "default" : "outline"}
+                  size="lg"
+                  onClick={() => setSelectedPreLang("it")}
+                >
+                  🇮🇹 Italiano
+                </Button>
+              </div>
             </div>
+
+            {/* Set selection */}
+            <div className="w-full">
+              <p className="mb-2 text-sm font-medium text-foreground">
+                {uiLang === "it" ? "Set di Domande" : "Question Set"}
+              </p>
+              <div className="flex w-full gap-3">
+                <Button
+                  className="flex-1"
+                  variant={selectedSet === "SET_01" ? "default" : "outline"}
+                  onClick={() => setSelectedSet("SET_01")}
+                >
+                  Set 1 {!hasActiveAccess ? "" : ""}
+                </Button>
+                <Button
+                  className="flex-1"
+                  variant={selectedSet === "SET_02" ? "default" : "outline"}
+                  onClick={() => hasActiveAccess && setSelectedSet("SET_02")}
+                  disabled={!hasActiveAccess}
+                >
+                  Set 2 {!hasActiveAccess && <Lock className="ml-1 h-3 w-3" />}
+                </Button>
+                <Button
+                  className="flex-1"
+                  variant={selectedSet === "SET_03" ? "default" : "outline"}
+                  onClick={() => hasActiveAccess && setSelectedSet("SET_03")}
+                  disabled={!hasActiveAccess}
+                >
+                  Set 3 {!hasActiveAccess && <Lock className="ml-1 h-3 w-3" />}
+                </Button>
+              </div>
+              {!hasActiveAccess && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {uiLang === "it" ? "Set 2 e 3 richiedono l'accesso Pro." : "Sets 2 & 3 require Pro access."}
+                </p>
+              )}
+            </div>
+
+            <Button
+              size="lg"
+              className="w-full"
+              onClick={() => setLang(selectedPreLang as Lang)}
+            >
+              {uiLang === "it" ? "Inizia Esame" : "Start Exam"}
+            </Button>
+
             <Link to="/dashboard" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              <ArrowLeft className="h-3.5 w-3.5" /> Back to Dashboard
+              <ArrowLeft className="h-3.5 w-3.5" /> {uiLang === "it" ? "Torna alla Dashboard" : "Back to Dashboard"}
             </Link>
           </CardContent>
         </Card>
