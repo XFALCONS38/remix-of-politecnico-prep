@@ -20,8 +20,10 @@ export type Database = {
           current_section: number | null
           id: string
           is_free_attempt: boolean | null
+          lang: string | null
           score: number | null
           section_scores: Json | null
+          set_id: string | null
           started_at: string | null
           status: Database["public"]["Enums"]["attempt_status"] | null
           submitted_at: string | null
@@ -32,8 +34,10 @@ export type Database = {
           current_section?: number | null
           id?: string
           is_free_attempt?: boolean | null
+          lang?: string | null
           score?: number | null
           section_scores?: Json | null
+          set_id?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["attempt_status"] | null
           submitted_at?: string | null
@@ -44,8 +48,10 @@ export type Database = {
           current_section?: number | null
           id?: string
           is_free_attempt?: boolean | null
+          lang?: string | null
           score?: number | null
           section_scores?: Json | null
+          set_id?: string | null
           started_at?: string | null
           status?: Database["public"]["Enums"]["attempt_status"] | null
           submitted_at?: string | null
@@ -141,6 +147,7 @@ export type Database = {
           display_name: string | null
           email: string | null
           id: string
+          preferred_lang: string | null
         }
         Insert: {
           access_expiry?: string | null
@@ -148,6 +155,7 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id: string
+          preferred_lang?: string | null
         }
         Update: {
           access_expiry?: string | null
@@ -155,6 +163,7 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           id?: string
+          preferred_lang?: string | null
         }
         Relationships: []
       }
