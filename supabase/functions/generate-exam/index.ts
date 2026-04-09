@@ -113,10 +113,12 @@ serve(async (req) => {
     // Parse body
     let isFree = true;
     let lang = "en";
+    let setId = "SET_01";
     try {
       const body = await req.json();
       isFree = body?.is_free ?? true;
       lang = body?.lang ?? "en";
+      setId = body?.set_id ?? "SET_01";
     } catch {
       // default free
     }
@@ -222,14 +224,12 @@ serve(async (req) => {
     }
 
     // Load all active questions
+    // Use set_id for filtering instead of is_free logic
     let questionsQuery = supabase
       .from("questions")
       .select("*")
-      .eq("is_active", true);
-
-    if (isFree) {
-      questionsQuery = questionsQuery.eq("set_id", "SET_01");
-    }
+      .eq("is_active", true)
+      .eq("set_id", setId);
 
     const { data: allQuestions } = await questionsQuery;
     if (!allQuestions || allQuestions.length === 0) {
@@ -382,6 +382,8 @@ serve(async (req) => {
         user_id: userId,
         is_free_attempt: (attemptCount ?? 0) === 0 || isFree,
         current_section: 1,
+        lang: lang,
+        set_id: setId,
       })
       .select("id, started_at")
       .single();
