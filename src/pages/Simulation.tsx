@@ -76,6 +76,7 @@ const Simulation = () => {
   const navigate = useNavigate();
 
   const [lang, setLang] = useState<Lang | null>(null);
+  const [selectedPreLang, setSelectedPreLang] = useState<string>((profile as any)?.preferred_lang === "it" ? "it" : "en");
   const [selectedSet, setSelectedSet] = useState<string>("SET_01");
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<ExamQuestion[]>([]);
