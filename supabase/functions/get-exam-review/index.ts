@@ -34,7 +34,7 @@ serve(async (req) => {
     // Get attempt
     const { data: attempt } = await supabase
       .from("attempts")
-      .select("id, user_id, score, section_scores, status, submitted_at, is_free_attempt")
+      .select("id, user_id, score, section_scores, status, submitted_at, is_free_attempt, lang, set_id")
       .eq("id", attempt_id)
       .single();
 

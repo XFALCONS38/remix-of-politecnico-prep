@@ -7,7 +7,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   hasActiveAccess: boolean;
-  profile: { id: string; email: string | null; display_name: string | null; access_expiry: string | null } | null;
+  profile: { id: string; email: string | null; display_name: string | null; access_expiry: string | null; preferred_lang: string | null } | null;
   signOut: () => Promise<void>;
 }
 
@@ -29,9 +29,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<AuthContextType["profile"]>(null);
 
   const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
+    const { data } = await (supabase as any)
       .from("profiles")
-      .select("id, email, display_name, access_expiry")
+      .select("id, email, display_name, access_expiry, preferred_lang")
       .eq("id", userId)
       .maybeSingle();
     setProfile(data);
