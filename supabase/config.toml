@@ -14,3 +14,15 @@ verify_jwt = false
 
 [functions.admin-questions]
 verify_jwt = false
+
+[functions.admin-dashboard]
+verify_jwt = false
+
+[functions.admin-subscribers]
+verify_jwt = false
+
+[functions.admin-discounts]
+verify_jwt = false
+
+[functions.parse-pdf-questions]
+verify_jwt = false
