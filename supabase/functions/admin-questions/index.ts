@@ -17,7 +17,6 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Auth + admin check
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("Missing authorization");
     const token = authHeader.replace("Bearer ", "");
@@ -28,23 +27,19 @@ serve(async (req) => {
     const { data: userData } = await anonClient.auth.getUser(token);
     if (!userData?.user) throw new Error("Unauthorized");
 
-    // Check admin role
     const { data: roleData } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", userData.user.id)
       .eq("role", "admin")
       .maybeSingle();
-
     if (!roleData) throw new Error("Admin access required");
 
     const body = await req.json();
     const action = body.action;
 
     if (action === "list") {
-      // List questions with optional filters
       let query = supabase.from("questions").select("*").order("created_at", { ascending: false });
-
       if (body.section) query = query.eq("section", body.section);
       if (body.topic) query = query.eq("topic", body.topic);
       if (body.difficulty) query = query.eq("difficulty", body.difficulty);
@@ -63,15 +58,61 @@ serve(async (req) => {
       });
     }
 
+    if (action === "get") {
+      const { question_id } = body;
+      if (!question_id) throw new Error("question_id required");
+
+      const { data, error } = await supabase
+        .from("questions")
+        .select("*")
+        .eq("id", question_id)
+        .single();
+      if (error) throw error;
+
+      return new Response(JSON.stringify({ question: data }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (action === "toggle_active") {
       const { question_id, is_active } = body;
       if (!question_id) throw new Error("question_id required");
 
       const { error } = await supabase
         .from("questions")
-        .update({ is_active: is_active })
+        .update({ is_active })
         .eq("id", question_id);
+      if (error) throw error;
 
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "update") {
+      const { question_id, ...updates } = body;
+      if (!question_id) throw new Error("question_id required");
+      delete updates.action;
+
+      const { error } = await supabase
+        .from("questions")
+        .update(updates)
+        .eq("id", question_id);
+      if (error) throw error;
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "delete") {
+      const { question_id } = body;
+      if (!question_id) throw new Error("question_id required");
+
+      const { error } = await supabase
+        .from("questions")
+        .delete()
+        .eq("id", question_id);
       if (error) throw error;
 
       return new Response(JSON.stringify({ success: true }), {
@@ -85,7 +126,6 @@ serve(async (req) => {
         throw new Error("questions array required");
       }
 
-      // Validate required fields
       for (let i = 0; i < questions.length; i++) {
         const q = questions[i];
         if (!q.set_id || !q.section || !q.question_code || !q.topic || !q.difficulty ||
@@ -104,7 +144,6 @@ serve(async (req) => {
         .from("questions")
         .insert(questions)
         .select("id, question_code, section");
-
       if (error) throw error;
 
       return new Response(JSON.stringify({ inserted: data?.length ?? 0, questions: data }), {
@@ -122,7 +161,6 @@ serve(async (req) => {
         .from("passages")
         .insert(passages)
         .select("id, set_id, title");
-
       if (error) throw error;
 
       return new Response(JSON.stringify({ inserted: data?.length ?? 0, passages: data }), {

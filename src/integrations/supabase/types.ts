@@ -59,6 +59,45 @@ export type Database = {
         }
         Relationships: []
       }
+      discount_codes: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          current_uses: number
+          discount_percent: number
+          id: string
+          is_active: boolean
+          max_uses: number | null
+          valid_from: string
+          valid_until: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          current_uses?: number
+          discount_percent: number
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          valid_from?: string
+          valid_until?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          current_uses?: number
+          discount_percent?: number
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          valid_from?: string
+          valid_until?: string | null
+        }
+        Relationships: []
+      }
       exam_attempt_answers: {
         Row: {
           assigned_letter: string
