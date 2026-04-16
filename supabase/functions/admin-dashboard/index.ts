@@ -45,25 +45,39 @@ serve(async (req) => {
       .gt("access_expiry", new Date().toISOString());
     const activeSubscribers = activeProfiles?.length ?? 0;
 
-    // ─── Revenue from subscriptions ───
+    // ─── Revenue: tier price × active subscribers in that tier ───
     const { data: subscriptions } = await supabase
       .from("subscriptions")
-      .select("amount_cents, currency, status, created_at, access_start, access_expiry");
+      .select("amount_cents, currency, status, created_at, access_start, access_expiry, tier, user_id");
+
+    const { data: tiersData } = await supabase
+      .from("subscription_tiers")
+      .select("name, price_cents, duration_days");
+    const tierPriceMap = new Map<string, { price: number; days: number }>();
+    for (const t of (tiersData ?? [])) tierPriceMap.set(t.name, { price: t.price_cents, days: t.duration_days });
 
     const now = new Date();
-    const activeSubsList = (subscriptions ?? []).filter((s: any) => s.status === "active");
-    const totalRevenueCents = activeSubsList.reduce((sum: number, s: any) => sum + (s.amount_cents ?? 0), 0);
+    const activeSubsList = (subscriptions ?? []).filter((s: any) =>
+      s.status === "active" && s.access_expiry && new Date(s.access_expiry) > now
+    );
 
-    // MRR: sum of active subscription amounts / avg duration in months
+    // Revenue by tier: count × tier price (or fallback to amount_cents)
+    const revenueByTier: Record<string, { count: number; revenue: number }> = {};
+    let totalRevenueCents = 0;
     let mrrCents = 0;
     for (const s of activeSubsList) {
-      const start = new Date(s.access_start);
-      const end = new Date(s.access_expiry);
-      const months = Math.max(1, (end.getTime() - start.getTime()) / (30 * 86400000));
-      mrrCents += (s.amount_cents ?? 0) / months;
+      const tierKey = s.tier || (s.amount_cents === 0 ? "Free/Manual" : `€${(s.amount_cents / 100).toFixed(0)}`);
+      const tierInfo = s.tier ? tierPriceMap.get(s.tier) : null;
+      const price = tierInfo?.price ?? s.amount_cents ?? 0;
+      const days = tierInfo?.days ?? 60;
+      if (!revenueByTier[tierKey]) revenueByTier[tierKey] = { count: 0, revenue: 0 };
+      revenueByTier[tierKey].count++;
+      revenueByTier[tierKey].revenue += price;
+      totalRevenueCents += price;
+      mrrCents += price / Math.max(1, days / 30);
     }
 
-    // Revenue by month (last 6 months)
+    // Revenue by month (last 6 months) — historical from subscriptions table
     const revenueByMonth: Record<string, number> = {};
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -76,15 +90,6 @@ serve(async (req) => {
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
         if (revenueByMonth[key] !== undefined) revenueByMonth[key] += (s.amount_cents ?? 0);
       }
-    }
-
-    // Revenue by tier (amount bucket)
-    const revenueByTier: Record<string, { count: number; revenue: number }> = {};
-    for (const s of activeSubsList) {
-      const tier = s.amount_cents === 0 ? "Free/Manual" : `€${(s.amount_cents / 100).toFixed(0)}`;
-      if (!revenueByTier[tier]) revenueByTier[tier] = { count: 0, revenue: 0 };
-      revenueByTier[tier].count++;
-      revenueByTier[tier].revenue += s.amount_cents;
     }
 
     // ─── Questions stats ───
