@@ -5,6 +5,7 @@ import AdminDashboard from "@/components/admin/AdminDashboard";
 import AdminSubscribers from "@/components/admin/AdminSubscribers";
 import AdminDiscounts from "@/components/admin/AdminDiscounts";
 import AdminQuestions from "@/components/admin/AdminQuestions";
+import AdminPassages from "@/components/admin/AdminPassages";
 
 const Admin = () => {
   return (
@@ -21,12 +22,14 @@ const Admin = () => {
           <TabsList className="mb-6">
             <TabsTrigger value="dashboard">Analytics</TabsTrigger>
             <TabsTrigger value="questions">Questions</TabsTrigger>
+            <TabsTrigger value="passages">Passages</TabsTrigger>
             <TabsTrigger value="subscribers">Subscribers</TabsTrigger>
             <TabsTrigger value="discounts">Discounts</TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard"><AdminDashboard /></TabsContent>
           <TabsContent value="questions"><AdminQuestions /></TabsContent>
+          <TabsContent value="passages"><AdminPassages /></TabsContent>
           <TabsContent value="subscribers"><AdminSubscribers /></TabsContent>
           <TabsContent value="discounts"><AdminDiscounts /></TabsContent>
         </Tabs>
