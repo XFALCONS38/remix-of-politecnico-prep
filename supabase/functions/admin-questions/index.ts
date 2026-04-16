@@ -126,6 +126,8 @@ serve(async (req) => {
         throw new Error("questions array required");
       }
 
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
       for (let i = 0; i < questions.length; i++) {
         const q = questions[i];
         if (!q.set_id || !q.section || !q.question_code || !q.topic || !q.difficulty ||
@@ -137,6 +139,40 @@ serve(async (req) => {
         }
         if (!Array.isArray(q.wrong_answers) || q.wrong_answers.length < 4) {
           throw new Error(`Question ${i}: wrong_answers must have at least 4 entries`);
+        }
+      }
+
+      // Resolve non-UUID passage_id strings (e.g., "set04_passage_anc") via passages.title within the same set_id
+      const passageLookups = new Map<string, string>(); // key: `${set_id}::${code}` -> uuid
+      const needed = new Map<string, Set<string>>(); // set_id -> Set<code>
+      for (const q of questions) {
+        if (q.passage_id && typeof q.passage_id === "string" && !UUID_RE.test(q.passage_id)) {
+          if (!needed.has(q.set_id)) needed.set(q.set_id, new Set());
+          needed.get(q.set_id)!.add(q.passage_id);
+        }
+      }
+      for (const [setId, codes] of needed) {
+        const codeArr = Array.from(codes);
+        const { data: rows, error: pErr } = await supabase
+          .from("passages")
+          .select("id, title, set_id")
+          .eq("set_id", setId)
+          .in("title", codeArr);
+        if (pErr) throw pErr;
+        for (const code of codeArr) {
+          const match = rows?.find((r: any) => r.title === code);
+          if (!match) {
+            throw new Error(`Passage code "${code}" not found in set "${setId}". Import the passage first (use bulk_insert_passages with title="${code}").`);
+          }
+          passageLookups.set(`${setId}::${code}`, match.id);
+        }
+      }
+      // Apply resolved UUIDs / null-out empty strings
+      for (const q of questions) {
+        if (q.passage_id === "" || q.passage_id === undefined) {
+          q.passage_id = null;
+        } else if (typeof q.passage_id === "string" && !UUID_RE.test(q.passage_id)) {
+          q.passage_id = passageLookups.get(`${q.set_id}::${q.passage_id}`) ?? null;
         }
       }
 
