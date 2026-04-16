@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import MathText from "@/components/MathText";
+import QuestionContent from "@/components/QuestionContent";
 
 interface ExamQuestion {
   eaa_id: string;
@@ -500,7 +501,7 @@ const Simulation = () => {
                       {lang === "it" ? "Brano di Lettura" : "Reading Passage"}
                     </p>
                     <div className="prose prose-sm max-w-none text-foreground whitespace-pre-wrap">
-                      <MathText text={currentPassage} />
+                      <QuestionContent text={currentPassage} />
                     </div>
                   </CardContent>
                 </Card>
@@ -539,9 +540,9 @@ const Simulation = () => {
                     </div>
                   </div>
 
-                  <p className="mb-6 text-lg font-medium leading-relaxed">
-                    <MathText text={getQuestionText(currentQuestion, lang)} />
-                  </p>
+                  <div className="mb-6 text-lg font-medium leading-relaxed">
+                    <QuestionContent text={getQuestionText(currentQuestion, lang)} />
+                  </div>
 
                   <div className="space-y-2">
                     {["A", "B", "C", "D", "E"].map((letter) => {

@@ -149,11 +149,7 @@ serve(async (req) => {
       if (!user_id || !days) throw new Error("user_id and days required");
 
       const expiry = new Date(Date.now() + days * 86400000).toISOString();
-      
-      // Update profile access
       await supabase.from("profiles").update({ access_expiry: expiry }).eq("id", user_id);
-      
-      // Create a subscription record
       await supabase.from("subscriptions").insert({
         user_id,
         amount_cents: 0,
@@ -161,6 +157,60 @@ serve(async (req) => {
         access_expiry: expiry,
         status: "active",
         stripe_session_id: "manual_grant_" + Date.now(),
+      });
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "grant_tier") {
+      const { user_id, tier, days, amount_cents } = body;
+      if (!user_id || !tier || !days) throw new Error("user_id, tier, days required");
+
+      const start = new Date();
+      const expiry = new Date(Date.now() + days * 86400000);
+
+      await supabase.from("profiles").update({ access_expiry: expiry.toISOString() }).eq("id", user_id);
+      await supabase.from("subscriptions").insert({
+        user_id,
+        amount_cents: amount_cents ?? 0,
+        access_start: start.toISOString(),
+        access_expiry: expiry.toISOString(),
+        status: "active",
+        tier,
+        stripe_session_id: "tier_grant_" + Date.now(),
+      });
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "custom_grant") {
+      const { user_id, tier, access_start, access_expiry } = body;
+      if (!user_id || !access_start || !access_expiry) throw new Error("user_id, access_start, access_expiry required");
+
+      // Look up tier price if provided
+      let amount_cents = 0;
+      if (tier) {
+        const { data: tierData } = await supabase
+          .from("subscription_tiers")
+          .select("price_cents")
+          .eq("name", tier)
+          .maybeSingle();
+        if (tierData) amount_cents = tierData.price_cents;
+      }
+
+      await supabase.from("profiles").update({ access_expiry }).eq("id", user_id);
+      await supabase.from("subscriptions").insert({
+        user_id,
+        amount_cents,
+        access_start,
+        access_expiry,
+        status: "active",
+        tier: tier ?? null,
+        stripe_session_id: "custom_grant_" + Date.now(),
       });
 
       return new Response(JSON.stringify({ success: true }), {

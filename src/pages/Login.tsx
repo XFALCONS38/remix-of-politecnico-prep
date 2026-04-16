@@ -16,33 +16,24 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { lang } = useTheme();
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, user, viewMode } = useAuth();
 
-  // If already logged in as admin, redirect
+  // If already logged in, route based on chosen view (admin can pick either)
   useEffect(() => {
-    if (user && isAdmin) navigate("/admin", { replace: true });
-    else if (user) navigate("/dashboard", { replace: true });
-  }, [user, isAdmin]);
+    if (!user) return;
+    if (isAdmin && viewMode === "admin") navigate("/admin", { replace: true });
+    else navigate("/dashboard", { replace: true });
+  }, [user, isAdmin, viewMode]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) {
       toast({ title: lang === "it" ? "Accesso fallito" : "Login failed", description: error.message, variant: "destructive" });
-    } else {
-      // Check admin role for this user
-      const { data: roleData } = await supabase.rpc("has_role", {
-        _user_id: data.user.id,
-        _role: "admin",
-      });
-      if (roleData) {
-        navigate("/admin", { replace: true });
-      } else {
-        navigate("/dashboard", { replace: true });
-      }
     }
+    // Redirect handled by the effect above once auth state propagates
   };
 
   return (

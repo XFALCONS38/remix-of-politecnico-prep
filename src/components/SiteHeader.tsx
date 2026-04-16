@@ -1,8 +1,8 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
-import { Moon, Sun, LogOut } from "lucide-react";
+import { Moon, Sun, LogOut, ShieldCheck, GraduationCap } from "lucide-react";
 
 interface SiteHeaderProps {
   showAuth?: boolean;
@@ -10,17 +10,46 @@ interface SiteHeaderProps {
 }
 
 const SiteHeader = ({ showAuth = true, showDashboard = false }: SiteHeaderProps) => {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, isAdmin, viewMode, setViewMode } = useAuth();
   const { theme, toggleTheme, lang, setLang } = useTheme();
+  const navigate = useNavigate();
+
+  const switchView = (mode: "admin" | "student") => {
+    setViewMode(mode);
+    navigate(mode === "admin" ? "/admin" : "/dashboard");
+  };
 
   return (
     <header className="sticky top-0 z-40 border-b bg-card/95 backdrop-blur">
-      <div className="container flex h-14 items-center justify-between">
+      <div className="container flex h-14 items-center justify-between gap-2">
         <Link to="/" className="text-xl font-bold tracking-tight text-foreground">
           TILPrep
         </Link>
         <div className="flex items-center gap-2">
-          {/* Language toggle */}
+          {/* Admin view toggle */}
+          {user && isAdmin && (
+            <div className="flex items-center rounded-md border bg-background p-0.5">
+              <button
+                onClick={() => switchView("admin")}
+                className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                  viewMode === "admin" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+                title="Admin View"
+              >
+                <ShieldCheck className="h-3 w-3" /> Admin
+              </button>
+              <button
+                onClick={() => switchView("student")}
+                className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+                  viewMode === "student" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+                title="Student View"
+              >
+                <GraduationCap className="h-3 w-3" /> Student
+              </button>
+            </div>
+          )}
+
           <Button
             variant="ghost"
             size="sm"
@@ -30,7 +59,6 @@ const SiteHeader = ({ showAuth = true, showDashboard = false }: SiteHeaderProps)
             {lang === "en" ? "🇮🇹 IT" : "🇬🇧 EN"}
           </Button>
 
-          {/* Theme toggle */}
           <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-8 w-8">
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
@@ -41,8 +69,10 @@ const SiteHeader = ({ showAuth = true, showDashboard = false }: SiteHeaderProps)
                 <div className="flex items-center gap-2">
                   <span className="hidden text-sm text-muted-foreground sm:inline">{profile?.email}</span>
                   {showDashboard && (
-                    <Link to="/dashboard">
-                      <Button variant="outline" size="sm">Dashboard</Button>
+                    <Link to={isAdmin && viewMode === "admin" ? "/admin" : "/dashboard"}>
+                      <Button variant="outline" size="sm">
+                        {isAdmin && viewMode === "admin" ? "Admin" : "Dashboard"}
+                      </Button>
                     </Link>
                   )}
                   <Button variant="ghost" size="sm" onClick={signOut} className="gap-1">

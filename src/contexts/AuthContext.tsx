@@ -2,12 +2,16 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
+type ViewMode = "admin" | "student";
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
   hasActiveAccess: boolean;
   isAdmin: boolean;
+  viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
   profile: { id: string; email: string | null; display_name: string | null; access_expiry: string | null; preferred_lang: string | null } | null;
   signOut: () => Promise<void>;
 }
@@ -18,11 +22,15 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   hasActiveAccess: false,
   isAdmin: false,
+  viewMode: "student",
+  setViewMode: () => {},
   profile: null,
   signOut: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
+
+const VIEW_MODE_KEY = "tilprep:viewMode";
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -30,6 +38,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<AuthContextType["profile"]>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [viewMode, setViewModeState] = useState<ViewMode>(() => {
+    if (typeof window === "undefined") return "student";
+    return (localStorage.getItem(VIEW_MODE_KEY) as ViewMode) || "student";
+  });
+
+  const setViewMode = (mode: ViewMode) => {
+    setViewModeState(mode);
+    localStorage.setItem(VIEW_MODE_KEY, mode);
+  };
 
   const fetchProfile = async (userId: string) => {
     const { data } = await (supabase as any)
@@ -45,7 +62,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       _user_id: userId,
       _role: "admin",
     });
-    setIsAdmin(!!data);
+    const adminFlag = !!data;
+    setIsAdmin(adminFlag);
+    // If admin and no view explicitly chosen yet, default to admin view
+    if (adminFlag && !localStorage.getItem(VIEW_MODE_KEY)) {
+      setViewMode("admin");
+    }
+    if (!adminFlag) {
+      setViewModeState("student");
+    }
   };
 
   useEffect(() => {
@@ -60,6 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setProfile(null);
         setIsAdmin(false);
+        setViewModeState("student");
       }
       setLoading(false);
     });
@@ -85,10 +111,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSession(null);
     setProfile(null);
     setIsAdmin(false);
+    localStorage.removeItem(VIEW_MODE_KEY);
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, hasActiveAccess, isAdmin, profile, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, hasActiveAccess, isAdmin, viewMode, setViewMode, profile, signOut }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,10 +8,13 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "@/hooks/use-toast";
-import { Upload, RefreshCw, Plus, Pencil, Trash2, FileText, Wand2 } from "lucide-react";
+import { Upload, RefreshCw, Plus, Pencil, Trash2, FileText, Wand2, AlertCircle, CheckCircle2 } from "lucide-react";
 import MathText from "@/components/MathText";
 import QuestionEditor from "./QuestionEditor";
+import { extractPdfText } from "@/lib/pdfExtractor";
+import { validateQuestions } from "@/lib/questionSchema";
 
 interface AdminQuestion {
   id: string;
@@ -31,6 +34,7 @@ interface AdminQuestion {
 
 const SECTIONS = ["mathematics", "logic", "physics", "technical"];
 const DIFFICULTIES = ["medium", "hard"];
+const PAGE_SIZE = 20;
 
 export default function AdminQuestions() {
   const [questions, setQuestions] = useState<AdminQuestion[]>([]);
@@ -38,17 +42,22 @@ export default function AdminQuestions() {
   const [filters, setFilters] = useState({ section: "", topic: "", difficulty: "", set_id: "" });
   const [bulkJson, setBulkJson] = useState("");
   const [importing, setImporting] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<{ index: number; message: string }[]>([]);
+  const [validCount, setValidCount] = useState<number>(0);
   const [importType, setImportType] = useState<"questions" | "passages">("questions");
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<any>(null);
   const [pdfText, setPdfText] = useState("");
   const [pdfParsing, setPdfParsing] = useState(false);
+  const [pdfExtracting, setPdfExtracting] = useState(false);
   const [pdfSetId, setPdfSetId] = useState("SET_01");
   const [pdfSection, setPdfSection] = useState("mathematics");
+  const [openSets, setOpenSets] = useState<string[]>([]);
+  const [pageBySet, setPageBySet] = useState<Record<string, number>>({});
 
   const loadQuestions = useCallback(async () => {
     setLoading(true);
-    const body: any = { action: "list", limit: 200 };
+    const body: any = { action: "list", limit: 1000 };
     if (filters.section) body.section = filters.section;
     if (filters.topic) body.topic = filters.topic;
     if (filters.difficulty) body.difficulty = filters.difficulty;
@@ -64,6 +73,17 @@ export default function AdminQuestions() {
   }, [filters]);
 
   useEffect(() => { loadQuestions(); }, [loadQuestions]);
+
+  // Group questions by set
+  const groupedBySet = useMemo(() => {
+    const map = new Map<string, AdminQuestion[]>();
+    for (const q of questions) {
+      const arr = map.get(q.set_id) ?? [];
+      arr.push(q);
+      map.set(q.set_id, arr);
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [questions]);
 
   const toggleActive = async (id: string, current: boolean) => {
     const { data, error } = await supabase.functions.invoke("admin-questions", {
@@ -101,6 +121,24 @@ export default function AdminQuestions() {
     }
   };
 
+  // Validate JSON in real time
+  useEffect(() => {
+    if (!bulkJson.trim() || importType !== "questions") {
+      setValidationErrors([]);
+      setValidCount(0);
+      return;
+    }
+    try {
+      const parsed = JSON.parse(bulkJson);
+      const result = validateQuestions(parsed);
+      setValidationErrors(result.errors);
+      setValidCount(result.valid.length);
+    } catch (e: any) {
+      setValidationErrors([{ index: -1, message: "Invalid JSON: " + e.message }]);
+      setValidCount(0);
+    }
+  }, [bulkJson, importType]);
+
   const handleBulkImport = async () => {
     if (!bulkJson.trim()) return;
     setImporting(true);
@@ -108,19 +146,39 @@ export default function AdminQuestions() {
       const parsed = JSON.parse(bulkJson);
       if (!Array.isArray(parsed)) throw new Error("Must be a JSON array");
 
-      const action = importType === "passages" ? "bulk_insert_passages" : "bulk_insert";
-      const bodyKey = importType === "passages" ? "passages" : "questions";
-
-      const { data, error } = await supabase.functions.invoke("admin-questions", {
-        body: { action, [bodyKey]: parsed },
-      });
-
-      if (error || data?.error) {
-        toast({ title: "Import failed", description: data?.error || error?.message, variant: "destructive" });
+      if (importType === "questions") {
+        const result = validateQuestions(parsed);
+        if (result.errors.length > 0) {
+          toast({
+            title: `${result.errors.length} invalid question(s)`,
+            description: `Importing ${result.valid.length} valid; first error: ${result.errors[0].message}`,
+            variant: "destructive",
+          });
+        }
+        if (result.valid.length === 0) {
+          setImporting(false);
+          return;
+        }
+        const { data, error } = await supabase.functions.invoke("admin-questions", {
+          body: { action: "bulk_insert", questions: result.valid },
+        });
+        if (error || data?.error) {
+          toast({ title: "Import failed", description: data?.error || error?.message, variant: "destructive" });
+        } else {
+          toast({ title: "Import successful", description: `${data.inserted} questions inserted` });
+          setBulkJson("");
+          loadQuestions();
+        }
       } else {
-        toast({ title: "Import successful", description: `${data.inserted} ${importType} inserted` });
-        setBulkJson("");
-        if (importType === "questions") loadQuestions();
+        const { data, error } = await supabase.functions.invoke("admin-questions", {
+          body: { action: "bulk_insert_passages", passages: parsed },
+        });
+        if (error || data?.error) {
+          toast({ title: "Import failed", description: data?.error || error?.message, variant: "destructive" });
+        } else {
+          toast({ title: "Import successful", description: `${data.inserted} passages inserted` });
+          setBulkJson("");
+        }
       }
     } catch (err: any) {
       toast({ title: "Invalid JSON", description: err.message, variant: "destructive" });
@@ -138,7 +196,7 @@ export default function AdminQuestions() {
       toast({ title: "Parse failed", description: data?.error || error?.message, variant: "destructive" });
     } else if (data?.questions) {
       setBulkJson(JSON.stringify(data.questions, null, 2));
-      toast({ title: `Extracted ${data.count} questions`, description: "Review the JSON and import" });
+      toast({ title: `Extracted ${data.count} questions`, description: "Review JSON in the JSON Import tab and import" });
     }
     setPdfParsing(false);
   };
@@ -147,12 +205,19 @@ export default function AdminQuestions() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.type === "application/pdf") {
-      toast({ title: "PDF Upload", description: "Please paste the extracted text from the PDF below, or use a PDF reader to copy the content." });
+    if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+      setPdfExtracting(true);
+      try {
+        const text = await extractPdfText(file);
+        setPdfText(text);
+        toast({ title: "PDF extracted", description: `${text.length.toLocaleString()} characters loaded` });
+      } catch (err: any) {
+        toast({ title: "PDF parse failed", description: err.message, variant: "destructive" });
+      }
+      setPdfExtracting(false);
       return;
     }
 
-    // Handle text files
     const text = await file.text();
     setPdfText(text);
   };
@@ -174,7 +239,7 @@ export default function AdminQuestions() {
           <Card>
             <CardHeader><CardTitle className="text-base flex items-center gap-2"><Upload className="h-4 w-4" /> JSON Bulk Import</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3 items-center">
                 <Select value={importType} onValueChange={(v) => setImportType(v as any)}>
                   <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -182,32 +247,55 @@ export default function AdminQuestions() {
                     <SelectItem value="passages">Passages</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button onClick={handleBulkImport} disabled={importing || !bulkJson.trim()}>
-                  {importing ? "Importing..." : "Import"}
+                <Button onClick={handleBulkImport} disabled={importing || !bulkJson.trim() || (importType === "questions" && validCount === 0)}>
+                  {importing ? "Importing..." : `Import ${validCount > 0 ? `(${validCount} valid)` : ""}`}
                 </Button>
+                {importType === "questions" && bulkJson.trim() && (
+                  <div className="flex items-center gap-2 text-xs">
+                    {validationErrors.length === 0 ? (
+                      <span className="flex items-center gap-1 text-success"><CheckCircle2 className="h-3.5 w-3.5" /> All {validCount} valid</span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-destructive"><AlertCircle className="h-3.5 w-3.5" /> {validationErrors.length} error(s) · {validCount} valid</span>
+                    )}
+                  </div>
+                )}
               </div>
+              <p className="text-xs text-muted-foreground">
+                Tip: Each question can target a different <code>set_id</code> and <code>section</code> — bulk-import maps them to the correct destinations automatically.
+              </p>
               <Textarea
-                placeholder="Paste JSON array here..."
+                placeholder='[{"set_id":"SET_01","section":"mathematics","question_code":"M01",...}]'
                 value={bulkJson}
                 onChange={(e) => setBulkJson(e.target.value)}
                 className="min-h-[200px] font-mono text-xs"
               />
+              {validationErrors.length > 0 && (
+                <div className="rounded border border-destructive/40 bg-destructive/5 p-2 max-h-40 overflow-y-auto">
+                  <p className="text-xs font-medium mb-1 text-destructive">Validation errors:</p>
+                  <ul className="text-xs space-y-0.5">
+                    {validationErrors.slice(0, 10).map((e, i) => (
+                      <li key={i}>• #{e.index}: {e.message}</li>
+                    ))}
+                    {validationErrors.length > 10 && <li className="text-muted-foreground">…and {validationErrors.length - 10} more</li>}
+                  </ul>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="pdf">
           <Card>
-            <CardHeader><CardTitle className="text-base flex items-center gap-2"><Wand2 className="h-4 w-4" /> AI-Powered Extraction</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base flex items-center gap-2"><Wand2 className="h-4 w-4" /> PDF / AI-Powered Extraction</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-xs text-muted-foreground">Paste text from a PDF or document. AI will extract and structure the questions.</p>
+              <p className="text-xs text-muted-foreground">Upload a PDF (text-extracted via pdf.js) or paste raw text. AI structures the questions into JSON.</p>
               <div className="flex flex-wrap gap-3">
                 <div>
-                  <label className="text-xs text-muted-foreground">Target Set</label>
+                  <label className="text-xs text-muted-foreground">Default Set</label>
                   <Input className="w-32" value={pdfSetId} onChange={(e) => setPdfSetId(e.target.value)} />
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground">Section</label>
+                  <label className="text-xs text-muted-foreground">Default Section</label>
                   <Select value={pdfSection} onValueChange={setPdfSection}>
                     <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
                     <SelectContent>{SECTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
@@ -215,13 +303,15 @@ export default function AdminQuestions() {
                 </div>
                 <div className="flex items-end">
                   <label className="cursor-pointer">
-                    <input type="file" accept=".txt,.md,.csv" className="hidden" onChange={handlePdfFileUpload} />
-                    <Button variant="outline" size="sm" asChild><span><FileText className="h-3 w-3 mr-1" /> Load File</span></Button>
+                    <input type="file" accept=".pdf,.txt,.md,.csv" className="hidden" onChange={handlePdfFileUpload} />
+                    <Button variant="outline" size="sm" disabled={pdfExtracting} asChild>
+                      <span><FileText className="h-3 w-3 mr-1" /> {pdfExtracting ? "Extracting..." : "Upload PDF / Text"}</span>
+                    </Button>
                   </label>
                 </div>
               </div>
               <Textarea
-                placeholder="Paste text content here..."
+                placeholder="PDF text appears here, or paste content directly..."
                 value={pdfText}
                 onChange={(e) => setPdfText(e.target.value)}
                 className="min-h-[200px] font-mono text-xs"
@@ -244,11 +334,11 @@ export default function AdminQuestions() {
         </TabsContent>
       </Tabs>
 
-      {/* Question List */}
+      {/* Question Bank — by Set */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">Questions ({questions.length})</CardTitle>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle className="text-base">Question Bank — {questions.length} questions in {groupedBySet.length} set(s)</CardTitle>
             <Button variant="ghost" size="sm" onClick={loadQuestions}><RefreshCw className="h-4 w-4 mr-1" /> Refresh</Button>
           </div>
         </CardHeader>
@@ -274,54 +364,82 @@ export default function AdminQuestions() {
 
           {loading ? (
             <p className="text-muted-foreground text-sm">Loading...</p>
-          ) : questions.length === 0 ? (
+          ) : groupedBySet.length === 0 ? (
             <p className="text-muted-foreground text-sm">No questions found.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-2 pr-3">Code</th>
-                    <th className="pb-2 pr-3">Section</th>
-                    <th className="pb-2 pr-3">Topic</th>
-                    <th className="pb-2 pr-3">Diff</th>
-                    <th className="pb-2 pr-3">Set</th>
-                    <th className="pb-2 pr-3">Rate</th>
-                    <th className="pb-2 pr-3">IT</th>
-                    <th className="pb-2 pr-3">Active</th>
-                    <th className="pb-2 pr-3">Question</th>
-                    <th className="pb-2">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {questions.map((q) => (
-                    <tr key={q.id} className="border-b last:border-0">
-                      <td className="py-2 pr-3 font-mono text-xs">{q.question_code}</td>
-                      <td className="py-2 pr-3"><Badge variant="secondary" className="text-xs">{q.section}</Badge></td>
-                      <td className="py-2 pr-3 text-xs">{q.topic}</td>
-                      <td className="py-2 pr-3">
-                        <Badge variant={q.difficulty === "hard" ? "destructive" : "secondary"} className="text-xs">{q.difficulty}</Badge>
-                      </td>
-                      <td className="py-2 pr-3 text-xs">{q.set_id}</td>
-                      <td className="py-2 pr-3 text-xs">{successRate(q)}</td>
-                      <td className="py-2 pr-3">
-                        <Badge variant={q.it_ready ? "default" : "outline"} className="text-xs">{q.it_ready ? "✓" : "✗"}</Badge>
-                      </td>
-                      <td className="py-2 pr-3">
-                        <Switch checked={q.is_active} onCheckedChange={() => toggleActive(q.id, q.is_active)} />
-                      </td>
-                      <td className="py-2 pr-3 text-xs max-w-[200px] truncate"><MathText text={q.question_text_en} /></td>
-                      <td className="py-2">
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => editQuestion(q.id)}><Pencil className="h-3.5 w-3.5" /></Button>
-                          <Button variant="ghost" size="sm" onClick={() => deleteQuestion(q.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+            <Accordion type="multiple" value={openSets} onValueChange={setOpenSets}>
+              {groupedBySet.map(([setId, qs]) => {
+                const page = pageBySet[setId] ?? 0;
+                const totalPages = Math.ceil(qs.length / PAGE_SIZE);
+                const visible = qs.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+                const activeCount = qs.filter(q => q.is_active).length;
+                return (
+                  <AccordionItem key={setId} value={setId}>
+                    <AccordionTrigger>
+                      <div className="flex items-center gap-3 text-sm">
+                        <span className="font-medium">{setId}</span>
+                        <Badge variant="secondary" className="text-xs">{qs.length} questions</Badge>
+                        <Badge variant="outline" className="text-xs">{activeCount} active</Badge>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b text-left text-muted-foreground">
+                              <th className="pb-2 pr-3">Code</th>
+                              <th className="pb-2 pr-3">Section</th>
+                              <th className="pb-2 pr-3">Topic</th>
+                              <th className="pb-2 pr-3">Diff</th>
+                              <th className="pb-2 pr-3">Rate</th>
+                              <th className="pb-2 pr-3">IT</th>
+                              <th className="pb-2 pr-3">Active</th>
+                              <th className="pb-2 pr-3">Question</th>
+                              <th className="pb-2">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {visible.map((q) => (
+                              <tr key={q.id} className="border-b last:border-0">
+                                <td className="py-2 pr-3 font-mono text-xs">{q.question_code}</td>
+                                <td className="py-2 pr-3"><Badge variant="secondary" className="text-xs">{q.section}</Badge></td>
+                                <td className="py-2 pr-3 text-xs">{q.topic}</td>
+                                <td className="py-2 pr-3">
+                                  <Badge variant={q.difficulty === "hard" ? "destructive" : "secondary"} className="text-xs">{q.difficulty}</Badge>
+                                </td>
+                                <td className="py-2 pr-3 text-xs">{successRate(q)}</td>
+                                <td className="py-2 pr-3">
+                                  <Badge variant={q.it_ready ? "default" : "outline"} className="text-xs">{q.it_ready ? "✓" : "✗"}</Badge>
+                                </td>
+                                <td className="py-2 pr-3">
+                                  <Switch checked={q.is_active} onCheckedChange={() => toggleActive(q.id, q.is_active)} />
+                                </td>
+                                <td className="py-2 pr-3 text-xs max-w-[200px] truncate"><MathText text={q.question_text_en} /></td>
+                                <td className="py-2">
+                                  <div className="flex gap-1">
+                                    <Button variant="ghost" size="sm" onClick={() => editQuestion(q.id)}><Pencil className="h-3.5 w-3.5" /></Button>
+                                    <Button variant="ghost" size="sm" onClick={() => deleteQuestion(q.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {totalPages > 1 && (
+                        <div className="mt-3 flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Page {page + 1} of {totalPages}</span>
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPageBySet(p => ({ ...p, [setId]: page - 1 }))}>Prev</Button>
+                            <Button size="sm" variant="outline" disabled={page >= totalPages - 1} onClick={() => setPageBySet(p => ({ ...p, [setId]: page + 1 }))}>Next</Button>
+                          </div>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      )}
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
           )}
         </CardContent>
       </Card>
