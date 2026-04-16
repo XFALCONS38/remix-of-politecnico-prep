@@ -9,10 +9,11 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 export const PaidRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading, hasActiveAccess } = useAuth();
+  const { user, loading, hasActiveAccess, isAdmin } = useAuth();
   if (loading) return <div className="flex min-h-screen items-center justify-center">Loading...</div>;
   if (!user) return <Navigate to="/login" replace />;
-  if (!hasActiveAccess) return <Navigate to="/pricing" replace />;
+  // Admins always have access for testing
+  if (!hasActiveAccess && !isAdmin) return <Navigate to="/pricing" replace />;
   return <>{children}</>;
 };
 
