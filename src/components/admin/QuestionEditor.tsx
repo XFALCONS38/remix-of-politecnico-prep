@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,9 @@ import { toast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Upload, Image as ImageIcon, Eye } from "lucide-react";
+import QuestionContent from "@/components/QuestionContent";
 
 interface QuestionData {
   id?: string;
@@ -62,8 +64,10 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
-  question?: any; // existing question to edit
+  question?: any;
 }
+
+type TextField = "question_text_en" | "question_text_it" | "solution_en" | "solution_it";
 
 export default function QuestionEditor({ open, onClose, onSaved, question }: Props) {
   const isEdit = !!question;
@@ -95,15 +99,26 @@ export default function QuestionEditor({ open, onClose, onSaved, question }: Pro
   });
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
+
+  // Refs to track cursor position per textarea
+  const textareaRefs = useRef<Record<TextField, HTMLTextAreaElement | null>>({
+    question_text_en: null, question_text_it: null, solution_en: null, solution_it: null,
+  });
 
   const set = (key: keyof QuestionData, value: any) => setData(p => ({ ...p, [key]: value }));
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: "question_text_en" | "question_text_it") => {
+  /**
+   * Insert image at cursor position using [Image_ID:url] marker so the
+   * image can be wedged anywhere within question text — above, below,
+   * or between paragraphs.
+   */
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: TextField) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    const fileName = `${Date.now()}_${file.name}`;
-    const { data: uploadData, error } = await supabase.storage
+    const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    const { error } = await supabase.storage
       .from("question-images")
       .upload(fileName, file);
 
@@ -111,11 +126,21 @@ export default function QuestionEditor({ open, onClose, onSaved, question }: Pro
       toast({ title: "Upload failed", description: error.message, variant: "destructive" });
     } else {
       const { data: urlData } = supabase.storage.from("question-images").getPublicUrl(fileName);
-      const imgTag = `\n![image](${urlData.publicUrl})\n`;
-      set(field, data[field] + imgTag);
-      toast({ title: "Image uploaded" });
+      const marker = `\n[Image_ID: ${urlData.publicUrl}]\n`;
+      const ta = textareaRefs.current[field];
+      const current = data[field];
+      if (ta && typeof ta.selectionStart === "number") {
+        const start = ta.selectionStart;
+        const end = ta.selectionEnd;
+        const next = current.slice(0, start) + marker + current.slice(end);
+        set(field, next);
+      } else {
+        set(field, current + marker);
+      }
+      toast({ title: "Image inserted at cursor" });
     }
     setUploading(false);
+    e.target.value = "";
   };
 
   const save = async () => {
@@ -186,15 +211,48 @@ export default function QuestionEditor({ open, onClose, onSaved, question }: Pro
     set("wrong_answers", [...data.wrong_answers, { text_en: "", text_it: "", error_label: "", explanation_en: "", explanation_it: "" }]);
   };
 
+  const ImageInsertButton = ({ field }: { field: TextField }) => (
+    <label className="cursor-pointer">
+      <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, field)} />
+      <Button variant="outline" size="sm" disabled={uploading} asChild>
+        <span><ImageIcon className="h-3 w-3 mr-1" /> Insert Image</span>
+      </Button>
+    </label>
+  );
+
   return (
     <Dialog open={open} onOpenChange={() => onClose()}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Question" : "Create Question"}</DialogTitle>
+          <DialogTitle className="flex items-center justify-between">
+            <span>{isEdit ? "Edit Question" : "Create Question"}</span>
+            <Button variant="outline" size="sm" onClick={() => setPreviewMode(p => !p)} className="gap-1">
+              <Eye className="h-3.5 w-3.5" /> {previewMode ? "Edit" : "Preview"}
+            </Button>
+          </DialogTitle>
         </DialogHeader>
 
+        {previewMode ? (
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              <p className="text-xs text-muted-foreground uppercase">Question (EN preview)</p>
+              <QuestionContent text={data.question_text_en} className="text-base" />
+              <div className="space-y-2 mt-4">
+                <p className="text-xs text-muted-foreground uppercase">Answers</p>
+                {[...data.correct_answers, ...data.wrong_answers].filter(a => a.text_en).map((a, i) => (
+                  <div key={i} className="rounded border p-2 text-sm">{a.text_en}</div>
+                ))}
+              </div>
+              {data.solution_en && (
+                <>
+                  <p className="text-xs text-muted-foreground uppercase mt-4">Solution</p>
+                  <QuestionContent text={data.solution_en} className="text-sm" />
+                </>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
         <div className="space-y-4">
-          {/* Basic info */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div>
               <Label className="text-xs">Set ID</Label>
@@ -250,7 +308,6 @@ export default function QuestionEditor({ open, onClose, onSaved, question }: Pro
             </div>
           </div>
 
-          {/* Question Text */}
           <Tabs defaultValue="en">
             <TabsList>
               <TabsTrigger value="en">English</TabsTrigger>
@@ -259,30 +316,50 @@ export default function QuestionEditor({ open, onClose, onSaved, question }: Pro
             <TabsContent value="en" className="space-y-2">
               <div className="flex items-center gap-2">
                 <Label className="text-xs">Question Text (EN)</Label>
-                <label className="cursor-pointer">
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, "question_text_en")} />
-                  <Button variant="outline" size="sm" disabled={uploading} asChild><span><Upload className="h-3 w-3 mr-1" /> Image</span></Button>
-                </label>
+                <ImageInsertButton field="question_text_en" />
+                <span className="text-[10px] text-muted-foreground">Click in textarea where you want the image, then Insert</span>
               </div>
-              <Textarea className="min-h-[120px] font-mono text-xs" value={data.question_text_en} onChange={(e) => set("question_text_en", e.target.value)} />
-              <Label className="text-xs">Solution (EN)</Label>
-              <Textarea className="min-h-[100px] font-mono text-xs" value={data.solution_en} onChange={(e) => set("solution_en", e.target.value)} />
+              <Textarea
+                ref={(el) => { textareaRefs.current.question_text_en = el; }}
+                className="min-h-[120px] font-mono text-xs"
+                value={data.question_text_en}
+                onChange={(e) => set("question_text_en", e.target.value)}
+              />
+              <div className="flex items-center gap-2">
+                <Label className="text-xs">Solution (EN)</Label>
+                <ImageInsertButton field="solution_en" />
+              </div>
+              <Textarea
+                ref={(el) => { textareaRefs.current.solution_en = el; }}
+                className="min-h-[100px] font-mono text-xs"
+                value={data.solution_en}
+                onChange={(e) => set("solution_en", e.target.value)}
+              />
             </TabsContent>
             <TabsContent value="it" className="space-y-2">
               <div className="flex items-center gap-2">
                 <Label className="text-xs">Question Text (IT)</Label>
-                <label className="cursor-pointer">
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(e, "question_text_it")} />
-                  <Button variant="outline" size="sm" disabled={uploading} asChild><span><Upload className="h-3 w-3 mr-1" /> Image</span></Button>
-                </label>
+                <ImageInsertButton field="question_text_it" />
               </div>
-              <Textarea className="min-h-[120px] font-mono text-xs" value={data.question_text_it} onChange={(e) => set("question_text_it", e.target.value)} />
-              <Label className="text-xs">Solution (IT)</Label>
-              <Textarea className="min-h-[100px] font-mono text-xs" value={data.solution_it} onChange={(e) => set("solution_it", e.target.value)} />
+              <Textarea
+                ref={(el) => { textareaRefs.current.question_text_it = el; }}
+                className="min-h-[120px] font-mono text-xs"
+                value={data.question_text_it}
+                onChange={(e) => set("question_text_it", e.target.value)}
+              />
+              <div className="flex items-center gap-2">
+                <Label className="text-xs">Solution (IT)</Label>
+                <ImageInsertButton field="solution_it" />
+              </div>
+              <Textarea
+                ref={(el) => { textareaRefs.current.solution_it = el; }}
+                className="min-h-[100px] font-mono text-xs"
+                value={data.solution_it}
+                onChange={(e) => set("solution_it", e.target.value)}
+              />
             </TabsContent>
           </Tabs>
 
-          {/* Correct Answers */}
           <div>
             <Label className="text-xs font-medium">Correct Answers</Label>
             {data.correct_answers.map((a, i) => (
@@ -293,7 +370,6 @@ export default function QuestionEditor({ open, onClose, onSaved, question }: Pro
             ))}
           </div>
 
-          {/* Wrong Answers */}
           <div>
             <div className="flex items-center justify-between">
               <Label className="text-xs font-medium">Wrong Answers ({data.wrong_answers.length})</Label>
@@ -319,6 +395,7 @@ export default function QuestionEditor({ open, onClose, onSaved, question }: Pro
             <Button onClick={save} disabled={saving}>{saving ? "Saving..." : isEdit ? "Update" : "Create"}</Button>
           </div>
         </div>
+        )}
       </DialogContent>
     </Dialog>
   );
