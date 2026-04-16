@@ -283,6 +283,36 @@ export type Database = {
           },
         ]
       }
+      subscription_tiers: {
+        Row: {
+          created_at: string
+          display_order: number
+          duration_days: number
+          id: string
+          is_active: boolean
+          name: string
+          price_cents: number
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          duration_days: number
+          id?: string
+          is_active?: boolean
+          name: string
+          price_cents?: number
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          duration_days?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          price_cents?: number
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           access_expiry: string
@@ -293,6 +323,7 @@ export type Database = {
           id: string
           status: Database["public"]["Enums"]["subscription_status"]
           stripe_session_id: string | null
+          tier: string | null
           user_id: string
         }
         Insert: {
@@ -304,6 +335,7 @@ export type Database = {
           id?: string
           status?: Database["public"]["Enums"]["subscription_status"]
           stripe_session_id?: string | null
+          tier?: string | null
           user_id: string
         }
         Update: {
@@ -315,6 +347,7 @@ export type Database = {
           id?: string
           status?: Database["public"]["Enums"]["subscription_status"]
           stripe_session_id?: string | null
+          tier?: string | null
           user_id?: string
         }
         Relationships: []
