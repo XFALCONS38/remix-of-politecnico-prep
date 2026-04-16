@@ -159,12 +159,29 @@ serve(async (req) => {
           .eq("set_id", setId)
           .in("title", codeArr);
         if (pErr) throw pErr;
+
+        const found = new Map<string, string>();
+        for (const r of rows ?? []) found.set((r as any).title, (r as any).id);
+
+        const missing = codeArr.filter(c => !found.has(c));
+        if (missing.length > 0) {
+          // Auto-create stub passages so question import doesn't fail.
+          // Admin can update passage_text_en later via the Passages UI.
+          const stubs = missing.map(code => ({
+            set_id: setId,
+            title: code,
+            passage_text_en: `[STUB] Passage "${code}" — please update with real text.`,
+          }));
+          const { data: created, error: cErr } = await supabase
+            .from("passages")
+            .insert(stubs)
+            .select("id, title");
+          if (cErr) throw new Error(`Failed to auto-create passages: ${cErr.message}`);
+          for (const r of created ?? []) found.set((r as any).title, (r as any).id);
+        }
+
         for (const code of codeArr) {
-          const match = rows?.find((r: any) => r.title === code);
-          if (!match) {
-            throw new Error(`Passage code "${code}" not found in set "${setId}". Import the passage first (use bulk_insert_passages with title="${code}").`);
-          }
-          passageLookups.set(`${setId}::${code}`, match.id);
+          passageLookups.set(`${setId}::${code}`, found.get(code)!);
         }
       }
       // Apply resolved UUIDs / null-out empty strings
