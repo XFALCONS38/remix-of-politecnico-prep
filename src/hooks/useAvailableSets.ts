@@ -2,9 +2,10 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Returns the dynamic list of set_ids that exist in the database
- * (union of sets used in questions + passages). No hardcoded limit —
- * however many sets the admin has uploaded will appear.
+ * Returns the dynamic list of set_ids available in the database.
+ * Uses a SECURITY DEFINER RPC so it works for both admins and regular
+ * users (who can't read the questions table directly). Whatever sets
+ * the admin uploads will appear automatically — no hardcoded limit.
  */
 export function useAvailableSets() {
   const [sets, setSets] = useState<string[]>([]);
@@ -12,14 +13,10 @@ export function useAvailableSets() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [qRes, pRes] = await Promise.all([
-      supabase.from("questions").select("set_id").limit(10000),
-      supabase.from("passages").select("set_id").limit(10000),
-    ]);
-    const all = new Set<string>();
-    (qRes.data ?? []).forEach((r: any) => r.set_id && all.add(r.set_id));
-    (pRes.data ?? []).forEach((r: any) => r.set_id && all.add(r.set_id));
-    setSets(Array.from(all).sort());
+    const { data, error } = await supabase.rpc("get_available_sets" as any);
+    if (!error && Array.isArray(data)) {
+      setSets((data as any[]).map((r) => r.set_id).filter(Boolean));
+    }
     setLoading(false);
   }, []);
 
