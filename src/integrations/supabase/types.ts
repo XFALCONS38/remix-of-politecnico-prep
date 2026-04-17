@@ -404,6 +404,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_available_sets: {
+        Args: never
+        Returns: {
+          set_id: string
+        }[]
+      }
       has_active_access: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
