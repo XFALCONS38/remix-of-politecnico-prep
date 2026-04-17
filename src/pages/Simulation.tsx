@@ -308,35 +308,43 @@ const Simulation = () => {
               <p className="mb-2 text-sm font-medium text-foreground">
                 {uiLang === "it" ? "Set di Domande" : "Question Set"}
               </p>
-              <div className="flex w-full gap-3">
-                <Button
-                  className="flex-1"
-                  variant={selectedSet === "SET_01" ? "default" : "outline"}
-                  onClick={() => setSelectedSet("SET_01")}
-                >
-                  Set 1 {!hasActiveAccess ? "" : ""}
-                </Button>
-                <Button
-                  className="flex-1"
-                  variant={selectedSet === "SET_02" ? "default" : "outline"}
-                  onClick={() => hasActiveAccess && setSelectedSet("SET_02")}
-                  disabled={!hasActiveAccess}
-                >
-                  Set 2 {!hasActiveAccess && <Lock className="ml-1 h-3 w-3" />}
-                </Button>
-                <Button
-                  className="flex-1"
-                  variant={selectedSet === "SET_03" ? "default" : "outline"}
-                  onClick={() => hasActiveAccess && setSelectedSet("SET_03")}
-                  disabled={!hasActiveAccess}
-                >
-                  Set 3 {!hasActiveAccess && <Lock className="ml-1 h-3 w-3" />}
-                </Button>
-              </div>
-              {!hasActiveAccess && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {uiLang === "it" ? "Set 2 e 3 richiedono l'accesso Pro." : "Sets 2 & 3 require Pro access."}
+              {setsLoading ? (
+                <p className="text-xs text-muted-foreground">
+                  {uiLang === "it" ? "Caricamento set..." : "Loading sets..."}
                 </p>
+              ) : availableSets.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {uiLang === "it" ? "Nessun set disponibile." : "No sets available yet."}
+                </p>
+              ) : (
+                <>
+                  <div className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3">
+                    {availableSets.map((sid, idx) => {
+                      const isFreeSet = idx === 0;
+                      const locked = !isFreeSet && !hasActiveAccess;
+                      const label = sid.replace(/^SET_?/i, "Set ").replace(/^Set 0*/i, "Set ");
+                      return (
+                        <Button
+                          key={sid}
+                          variant={selectedSet === sid ? "default" : "outline"}
+                          onClick={() => !locked && setSelectedSet(sid)}
+                          disabled={locked}
+                          className="justify-center"
+                        >
+                          {label}
+                          {locked && <Lock className="ml-1 h-3 w-3" />}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  {!hasActiveAccess && availableSets.length > 1 && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {uiLang === "it"
+                        ? `Solo il primo set è gratuito. Sblocca gli altri ${availableSets.length - 1} con Pro.`
+                        : `Only the first set is free. Unlock the other ${availableSets.length - 1} with Pro.`}
+                    </p>
+                  )}
+                </>
               )}
             </div>
 
