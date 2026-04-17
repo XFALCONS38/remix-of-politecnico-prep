@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "@/hooks/use-toast";
 import { BookOpen, Plus, Save, Trash2, RefreshCw, AlertTriangle } from "lucide-react";
+import { useAvailableSets } from "@/hooks/useAvailableSets";
 
 interface Passage {
   id: string;
@@ -19,15 +20,14 @@ interface Passage {
   created_at: string | null;
 }
 
-const SET_IDS = ["SET_01", "SET_02", "SET_03", "SET_04", "SET_05", "SET_06", "SET_07", "SET_08"];
-
 export default function AdminPassages() {
+  const { sets: availableSets, reload: reloadSets } = useAvailableSets();
   const [passages, setPassages] = useState<Passage[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [filterSet, setFilterSet] = useState<string>("");
 
-  // New passage form
+  // New passage form — free-text set ID so admins can create as many sets as they want
   const [newSetId, setNewSetId] = useState("SET_01");
   const [newTitle, setNewTitle] = useState("");
   const [newTextEn, setNewTextEn] = useState("");
