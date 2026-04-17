@@ -78,14 +78,6 @@ const Simulation = () => {
   const navigate = useNavigate();
   const { sets: availableSets, loading: setsLoading } = useAvailableSets();
 
-  // Auto-pick the first available set when the list loads
-  useEffect(() => {
-    if (availableSets.length > 0 && !availableSets.includes(selectedSet)) {
-      setSelectedSet(availableSets[0]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableSets]);
-
   const [lang, setLang] = useState<Lang | null>(null);
   const [selectedPreLang, setSelectedPreLang] = useState<string>((profile as any)?.preferred_lang === "it" ? "it" : "en");
   const [selectedSet, setSelectedSet] = useState<string>("SET_01");
@@ -97,6 +89,15 @@ const Simulation = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
+
+  // Auto-pick the first available set when the list loads
+  useEffect(() => {
+    if (availableSets.length > 0 && !availableSets.includes(selectedSet)) {
+      setSelectedSet(availableSets[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableSets]);
+
 
   // Kill-switch section state
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
