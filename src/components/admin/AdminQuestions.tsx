@@ -432,10 +432,20 @@ export default function AdminQuestions() {
                 const totalPages = Math.ceil(qs.length / PAGE_SIZE);
                 const visible = qs.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
                 const activeCount = qs.filter(q => q.is_active).length;
+                const setIds = qs.map(q => q.id);
+                const allSetSelected = setIds.length > 0 && setIds.every(i => selectedIds.has(i));
+                const someSetSelected = setIds.some(i => selectedIds.has(i));
                 return (
                   <AccordionItem key={setId} value={setId}>
                     <AccordionTrigger>
                       <div className="flex items-center gap-3 text-sm">
+                        <span
+                          onClick={(e) => { e.stopPropagation(); toggleSelectSet(setIds, allSetSelected); }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className="flex items-center"
+                        >
+                          <Checkbox checked={allSetSelected ? true : someSetSelected ? "indeterminate" as any : false} />
+                        </span>
                         <span className="font-medium">{setId}</span>
                         <Badge variant="secondary" className="text-xs">{qs.length} questions</Badge>
                         <Badge variant="outline" className="text-xs">{activeCount} active</Badge>
@@ -446,6 +456,7 @@ export default function AdminQuestions() {
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b text-left text-muted-foreground">
+                              <th className="pb-2 pr-3 w-8"></th>
                               <th className="pb-2 pr-3">Code</th>
                               <th className="pb-2 pr-3">Section</th>
                               <th className="pb-2 pr-3">Topic</th>
@@ -460,6 +471,9 @@ export default function AdminQuestions() {
                           <tbody>
                             {visible.map((q) => (
                               <tr key={q.id} className="border-b last:border-0">
+                                <td className="py-2 pr-3">
+                                  <Checkbox checked={selectedIds.has(q.id)} onCheckedChange={() => toggleSelected(q.id)} />
+                                </td>
                                 <td className="py-2 pr-3 font-mono text-xs">{q.question_code}</td>
                                 <td className="py-2 pr-3"><Badge variant="secondary" className="text-xs">{q.section}</Badge></td>
                                 <td className="py-2 pr-3 text-xs">{q.topic}</td>
