@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "@/hooks/use-toast";
 import { Upload, RefreshCw, Plus, Pencil, Trash2, FileText, Wand2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import MathText from "@/components/MathText";
 import QuestionEditor from "./QuestionEditor";
 import { extractPdfText } from "@/lib/pdfExtractor";
