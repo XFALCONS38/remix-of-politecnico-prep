@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import MathText from "@/components/MathText";
 import QuestionContent from "@/components/QuestionContent";
+import { useAvailableSets } from "@/hooks/useAvailableSets";
 
 interface ExamQuestion {
   eaa_id: string;
