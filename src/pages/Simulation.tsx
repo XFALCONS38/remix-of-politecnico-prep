@@ -76,6 +76,7 @@ const Simulation = () => {
   const { user, hasActiveAccess, profile } = useAuth();
   const { lang: uiLang } = useTheme();
   const navigate = useNavigate();
+  const { sets: availableSets, loading: setsLoading } = useAvailableSets();
 
   const [lang, setLang] = useState<Lang | null>(null);
   const [selectedPreLang, setSelectedPreLang] = useState<string>((profile as any)?.preferred_lang === "it" ? "it" : "en");
