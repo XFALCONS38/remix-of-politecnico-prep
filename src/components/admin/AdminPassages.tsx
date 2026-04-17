@@ -139,11 +139,20 @@ export default function AdminPassages() {
           </p>
           <div className="flex flex-wrap gap-3">
             <div>
-              <label className="text-xs text-muted-foreground">Set</label>
-              <Select value={newSetId} onValueChange={setNewSetId}>
-                <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-                <SelectContent>{SET_IDS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-              </Select>
+              <label className="text-xs text-muted-foreground">Set ID</label>
+              <Input
+                className="w-40"
+                placeholder="SET_01"
+                value={newSetId}
+                onChange={(e) => setNewSetId(e.target.value.trim().toUpperCase())}
+                list="passage-set-options"
+              />
+              <datalist id="passage-set-options">
+                {availableSets.map((s) => <option key={s} value={s} />)}
+              </datalist>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Type any ID (e.g. SET_16). Existing ones are suggested.
+              </p>
             </div>
             <div className="flex-1 min-w-[240px]">
               <label className="text-xs text-muted-foreground">Title / code</label>
@@ -186,7 +195,7 @@ export default function AdminPassages() {
                 <SelectTrigger className="w-32"><SelectValue placeholder="Set" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All sets</SelectItem>
-                  {SET_IDS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  {availableSets.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Button variant="ghost" size="sm" onClick={load}><RefreshCw className="h-4 w-4 mr-1" /> Refresh</Button>
