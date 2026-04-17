@@ -384,7 +384,21 @@ export default function AdminQuestions() {
         <CardHeader>
           <div className="flex items-center justify-between flex-wrap gap-2">
             <CardTitle className="text-base">Question Bank — {questions.length} questions in {groupedBySet.length} set(s)</CardTitle>
-            <Button variant="ghost" size="sm" onClick={loadQuestions}><RefreshCw className="h-4 w-4 mr-1" /> Refresh</Button>
+            <div className="flex items-center gap-2">
+              {selectedIds.size > 0 && (
+                <>
+                  <span className="text-xs text-muted-foreground">{selectedIds.size} selected</span>
+                  <Button variant="ghost" size="sm" onClick={clearSelection}>Clear</Button>
+                  <Button variant="destructive" size="sm" onClick={bulkDelete} disabled={bulkDeleting}>
+                    <Trash2 className="h-3.5 w-3.5 mr-1" /> {bulkDeleting ? "Deleting..." : `Delete ${selectedIds.size}`}
+                  </Button>
+                </>
+              )}
+              {selectedIds.size === 0 && questions.length > 0 && (
+                <Button variant="outline" size="sm" onClick={selectAllVisible}>Select all loaded</Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={loadQuestions}><RefreshCw className="h-4 w-4 mr-1" /> Refresh</Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
