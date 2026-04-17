@@ -80,6 +80,7 @@ export default function AdminPassages() {
       toast({ title: "Passage created", description: `${newSetId} · ${newTitle}` });
       setNewTitle(""); setNewTextEn(""); setNewTextIt("");
       load();
+      reloadSets();
     }
   };
 
