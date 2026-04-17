@@ -55,6 +55,8 @@ export default function AdminQuestions() {
   const [pdfSection, setPdfSection] = useState("mathematics");
   const [openSets, setOpenSets] = useState<string[]>([]);
   const [pageBySet, setPageBySet] = useState<Record<string, number>>({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const loadQuestions = useCallback(async () => {
     setLoading(true);
