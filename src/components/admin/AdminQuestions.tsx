@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "@/hooks/use-toast";
 import { Upload, RefreshCw, Plus, Pencil, Trash2, FileText, Wand2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import MathText from "@/components/MathText";
 import QuestionEditor from "./QuestionEditor";
 import { extractPdfText } from "@/lib/pdfExtractor";
@@ -54,6 +55,8 @@ export default function AdminQuestions() {
   const [pdfSection, setPdfSection] = useState("mathematics");
   const [openSets, setOpenSets] = useState<string[]>([]);
   const [pageBySet, setPageBySet] = useState<Record<string, number>>({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const loadQuestions = useCallback(async () => {
     setLoading(true);
@@ -106,7 +109,49 @@ export default function AdminQuestions() {
     } else {
       toast({ title: "Deleted" });
       setQuestions(prev => prev.filter(q => q.id !== id));
+      setSelectedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
     }
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const toggleSelectSet = (ids: string[], allSelected: boolean) => {
+    setSelectedIds(prev => {
+      const n = new Set(prev);
+      if (allSelected) ids.forEach(i => n.delete(i));
+      else ids.forEach(i => n.add(i));
+      return n;
+    });
+  };
+
+  const selectAllVisible = () => {
+    setSelectedIds(new Set(questions.map(q => q.id)));
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const bulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (!confirm(`Permanently delete ${ids.length} question(s)? This cannot be undone.`)) return;
+    setBulkDeleting(true);
+    const { data, error } = await supabase.functions.invoke("admin-questions", {
+      body: { action: "bulk_delete", question_ids: ids },
+    });
+    if (error || data?.error) {
+      toast({ title: "Bulk delete failed", description: data?.error || error?.message, variant: "destructive" });
+    } else {
+      toast({ title: "Deleted", description: `${data.deleted ?? ids.length} question(s) removed` });
+      setQuestions(prev => prev.filter(q => !selectedIds.has(q.id)));
+      clearSelection();
+    }
+    setBulkDeleting(false);
   };
 
   const editQuestion = async (id: string) => {
@@ -339,7 +384,21 @@ export default function AdminQuestions() {
         <CardHeader>
           <div className="flex items-center justify-between flex-wrap gap-2">
             <CardTitle className="text-base">Question Bank — {questions.length} questions in {groupedBySet.length} set(s)</CardTitle>
-            <Button variant="ghost" size="sm" onClick={loadQuestions}><RefreshCw className="h-4 w-4 mr-1" /> Refresh</Button>
+            <div className="flex items-center gap-2">
+              {selectedIds.size > 0 && (
+                <>
+                  <span className="text-xs text-muted-foreground">{selectedIds.size} selected</span>
+                  <Button variant="ghost" size="sm" onClick={clearSelection}>Clear</Button>
+                  <Button variant="destructive" size="sm" onClick={bulkDelete} disabled={bulkDeleting}>
+                    <Trash2 className="h-3.5 w-3.5 mr-1" /> {bulkDeleting ? "Deleting..." : `Delete ${selectedIds.size}`}
+                  </Button>
+                </>
+              )}
+              {selectedIds.size === 0 && questions.length > 0 && (
+                <Button variant="outline" size="sm" onClick={selectAllVisible}>Select all loaded</Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={loadQuestions}><RefreshCw className="h-4 w-4 mr-1" /> Refresh</Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -373,10 +432,20 @@ export default function AdminQuestions() {
                 const totalPages = Math.ceil(qs.length / PAGE_SIZE);
                 const visible = qs.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
                 const activeCount = qs.filter(q => q.is_active).length;
+                const setIds = qs.map(q => q.id);
+                const allSetSelected = setIds.length > 0 && setIds.every(i => selectedIds.has(i));
+                const someSetSelected = setIds.some(i => selectedIds.has(i));
                 return (
                   <AccordionItem key={setId} value={setId}>
                     <AccordionTrigger>
                       <div className="flex items-center gap-3 text-sm">
+                        <span
+                          onClick={(e) => { e.stopPropagation(); toggleSelectSet(setIds, allSetSelected); }}
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className="flex items-center"
+                        >
+                          <Checkbox checked={allSetSelected ? true : someSetSelected ? "indeterminate" as any : false} />
+                        </span>
                         <span className="font-medium">{setId}</span>
                         <Badge variant="secondary" className="text-xs">{qs.length} questions</Badge>
                         <Badge variant="outline" className="text-xs">{activeCount} active</Badge>
@@ -387,6 +456,7 @@ export default function AdminQuestions() {
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b text-left text-muted-foreground">
+                              <th className="pb-2 pr-3 w-8"></th>
                               <th className="pb-2 pr-3">Code</th>
                               <th className="pb-2 pr-3">Section</th>
                               <th className="pb-2 pr-3">Topic</th>
@@ -401,6 +471,9 @@ export default function AdminQuestions() {
                           <tbody>
                             {visible.map((q) => (
                               <tr key={q.id} className="border-b last:border-0">
+                                <td className="py-2 pr-3">
+                                  <Checkbox checked={selectedIds.has(q.id)} onCheckedChange={() => toggleSelected(q.id)} />
+                                </td>
                                 <td className="py-2 pr-3 font-mono text-xs">{q.question_code}</td>
                                 <td className="py-2 pr-3"><Badge variant="secondary" className="text-xs">{q.section}</Badge></td>
                                 <td className="py-2 pr-3 text-xs">{q.topic}</td>
