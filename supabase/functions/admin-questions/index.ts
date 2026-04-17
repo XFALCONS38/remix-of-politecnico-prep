@@ -120,6 +120,46 @@ serve(async (req) => {
       });
     }
 
+    if (action === "bulk_delete") {
+      const { question_ids } = body;
+      if (!Array.isArray(question_ids) || question_ids.length === 0) {
+        throw new Error("question_ids array required");
+      }
+
+      const { error, count } = await supabase
+        .from("questions")
+        .delete({ count: "exact" })
+        .in("id", question_ids);
+      if (error) throw error;
+
+      return new Response(JSON.stringify({ success: true, deleted: count ?? question_ids.length }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "bulk_delete_filtered") {
+      // Delete every question matching the provided filters (set_id/section/topic/difficulty/is_active).
+      // At least one filter is required to avoid wiping the whole table.
+      const { set_id, section, topic, difficulty, is_active } = body;
+      if (!set_id && !section && !topic && !difficulty && is_active === undefined) {
+        throw new Error("At least one filter is required for bulk_delete_filtered");
+      }
+
+      let q = supabase.from("questions").delete({ count: "exact" });
+      if (set_id) q = q.eq("set_id", set_id);
+      if (section) q = q.eq("section", section);
+      if (topic) q = q.eq("topic", topic);
+      if (difficulty) q = q.eq("difficulty", difficulty);
+      if (is_active !== undefined) q = q.eq("is_active", is_active);
+
+      const { error, count } = await q;
+      if (error) throw error;
+
+      return new Response(JSON.stringify({ success: true, deleted: count ?? 0 }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (action === "bulk_insert") {
       const { questions } = body;
       if (!Array.isArray(questions) || questions.length === 0) {
