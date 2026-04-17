@@ -109,7 +109,49 @@ export default function AdminQuestions() {
     } else {
       toast({ title: "Deleted" });
       setQuestions(prev => prev.filter(q => q.id !== id));
+      setSelectedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
     }
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelectedIds(prev => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const toggleSelectSet = (ids: string[], allSelected: boolean) => {
+    setSelectedIds(prev => {
+      const n = new Set(prev);
+      if (allSelected) ids.forEach(i => n.delete(i));
+      else ids.forEach(i => n.add(i));
+      return n;
+    });
+  };
+
+  const selectAllVisible = () => {
+    setSelectedIds(new Set(questions.map(q => q.id)));
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const bulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (!confirm(`Permanently delete ${ids.length} question(s)? This cannot be undone.`)) return;
+    setBulkDeleting(true);
+    const { data, error } = await supabase.functions.invoke("admin-questions", {
+      body: { action: "bulk_delete", question_ids: ids },
+    });
+    if (error || data?.error) {
+      toast({ title: "Bulk delete failed", description: data?.error || error?.message, variant: "destructive" });
+    } else {
+      toast({ title: "Deleted", description: `${data.deleted ?? ids.length} question(s) removed` });
+      setQuestions(prev => prev.filter(q => !selectedIds.has(q.id)));
+      clearSelection();
+    }
+    setBulkDeleting(false);
   };
 
   const editQuestion = async (id: string) => {
