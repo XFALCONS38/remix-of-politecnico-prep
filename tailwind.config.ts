@@ -55,6 +55,22 @@ export default {
   				DEFAULT: 'hsl(var(--card))',
   				foreground: 'hsl(var(--card-foreground))'
   			},
+  			emerald: {
+  				DEFAULT: 'hsl(160, 84%, 39%)',
+  				foreground: 'hsl(0, 0%, 100%)'
+  			},
+  			amber: {
+  				DEFAULT: 'hsl(38, 92%, 50%)',
+  				foreground: 'hsl(0, 0%, 100%)'
+  			},
+  			danger: {
+  				DEFAULT: 'hsl(0, 84%, 60%)',
+  				foreground: 'hsl(0, 0%, 100%)'
+  			},
+  			'on-surface': 'hsl(207, 15%, 14%)',
+  			'on-surface-variant': 'hsl(220, 9%, 46%)',
+  			'container-low': 'hsl(210, 33%, 96%)',
+  			'container-highest': 'hsl(213, 17%, 90%)',
   			sidebar: {
   				DEFAULT: 'hsl(var(--sidebar-background))',
   				foreground: 'hsl(var(--sidebar-foreground))',
