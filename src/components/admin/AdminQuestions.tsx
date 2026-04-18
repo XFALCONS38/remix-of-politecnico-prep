@@ -34,7 +34,7 @@ interface AdminQuestion {
 }
 
 const SECTIONS = ["mathematics", "logic", "physics", "technical"];
-const DIFFICULTIES = ["medium", "hard"];
+const DIFFICULTIES = ["easy", "medium", "hard"];
 const PAGE_SIZE = 20;
 
 export default function AdminQuestions() {
