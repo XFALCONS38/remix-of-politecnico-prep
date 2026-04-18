@@ -34,7 +34,7 @@ interface QuestionData {
 }
 
 const SECTIONS = ["mathematics", "logic", "physics", "technical"];
-const DIFFICULTIES = ["medium", "hard"];
+const DIFFICULTIES = ["easy", "medium", "hard"];
 
 const emptyQuestion: QuestionData = {
   set_id: "SET_01",

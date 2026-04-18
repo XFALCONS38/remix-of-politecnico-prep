@@ -14,7 +14,7 @@ export const QuestionSchema = z.object({
   question_code: z.string().min(1),
   topic: z.string().min(1),
   subtopic: z.string().nullable().optional(),
-  difficulty: z.enum(["medium", "hard"]),
+  difficulty: z.enum(["easy", "medium", "hard"]),
   question_text_en: z.string().min(1),
   question_text_it: z.string().nullable().optional(),
   correct_answers: z.array(AnswerSchema).min(1),
