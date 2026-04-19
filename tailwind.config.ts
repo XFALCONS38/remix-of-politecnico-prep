@@ -153,6 +153,7 @@ export default {
   				'serif'
   			],
   			mono: [
+  				'JetBrains Mono',
   				'Space Mono',
   				'ui-monospace',
   				'SFMono-Regular',
