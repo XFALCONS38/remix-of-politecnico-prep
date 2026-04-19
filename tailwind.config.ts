@@ -129,6 +129,7 @@ export default {
   			'dm-sans': ['DM Sans', 'sans-serif'],
   			'playfair': ['Playfair Display', 'serif'],
   			'dm-mono': ['DM Mono', 'monospace'],
+  			'jetbrains': ['JetBrains Mono', 'monospace'],
   			sans: [
   				'Inter',
   				'ui-sans-serif',
@@ -152,6 +153,7 @@ export default {
   				'serif'
   			],
   			mono: [
+  				'JetBrains Mono',
   				'Space Mono',
   				'ui-monospace',
   				'SFMono-Regular',
