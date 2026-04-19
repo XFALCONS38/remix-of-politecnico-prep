@@ -71,6 +71,13 @@ export default {
   			'on-surface-variant': 'hsl(220, 9%, 46%)',
   			'container-low': 'hsl(210, 33%, 96%)',
   			'container-highest': 'hsl(213, 17%, 90%)',
+  			cream: { DEFAULT: '#F3EFE6', 50: '#F9F8F5', 100: '#EAE4D6' },
+  			navy: { DEFAULT: '#131B2A', 100: '#1D2A40' },
+  			terra: { DEFAULT: '#C2633E', hover: '#A65230' },
+  			darkbg: '#060E1C',
+  			darkcard: '#0D1627',
+  			gold: { DEFAULT: '#C8961E', hover: '#E8B840' },
+  			darkblue: { DEFAULT: '#162846', hover: '#1C3359' },
   			sidebar: {
   				DEFAULT: 'hsl(var(--sidebar-background))',
   				foreground: 'hsl(var(--sidebar-foreground))',
@@ -119,6 +126,9 @@ export default {
   			'pulse-fast': 'pulse 1s ease-in-out infinite'
   		},
   		fontFamily: {
+  			'dm-sans': ['DM Sans', 'sans-serif'],
+  			'playfair': ['Playfair Display', 'serif'],
+  			'dm-mono': ['DM Mono', 'monospace'],
   			sans: [
   				'Inter',
   				'ui-sans-serif',
