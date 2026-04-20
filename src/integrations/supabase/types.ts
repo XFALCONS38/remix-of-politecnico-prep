@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      abandoned_checkouts: {
+        Row: {
+          amount_cents: number | null
+          created_at: string
+          email: string
+          id: string
+          recovered_at: string | null
+          stripe_session_id: string | null
+          tier_slug: string | null
+          user_id: string | null
+        }
+        Insert: {
+          amount_cents?: number | null
+          created_at?: string
+          email: string
+          id?: string
+          recovered_at?: string | null
+          stripe_session_id?: string | null
+          tier_slug?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          amount_cents?: number | null
+          created_at?: string
+          email?: string
+          id?: string
+          recovered_at?: string | null
+          stripe_session_id?: string | null
+          tier_slug?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       attempts: {
         Row: {
           created_at: string | null
@@ -100,37 +133,46 @@ export type Database = {
       }
       exam_attempt_answers: {
         Row: {
+          answered_at: string | null
           assigned_letter: string
           created_at: string | null
           exam_attempt_id: string
+          first_seen_at: string | null
           id: string
           options_snapshot: Json
           question_id: string | null
           question_order: number
           section: string
           student_answer: string | null
+          time_spent_ms: number | null
         }
         Insert: {
+          answered_at?: string | null
           assigned_letter: string
           created_at?: string | null
           exam_attempt_id: string
+          first_seen_at?: string | null
           id?: string
           options_snapshot: Json
           question_id?: string | null
           question_order: number
           section: string
           student_answer?: string | null
+          time_spent_ms?: number | null
         }
         Update: {
+          answered_at?: string | null
           assigned_letter?: string
           created_at?: string | null
           exam_attempt_id?: string
+          first_seen_at?: string | null
           id?: string
           options_snapshot?: Json
           question_id?: string | null
           question_order?: number
           section?: string
           student_answer?: string | null
+          time_spent_ms?: number | null
         }
         Relationships: [
           {
@@ -176,6 +218,48 @@ export type Database = {
           passage_text_it?: string | null
           set_id?: string
           title?: string | null
+        }
+        Relationships: []
+      }
+      practice_attempts: {
+        Row: {
+          assigned_letter: string
+          created_at: string
+          id: string
+          is_correct: boolean | null
+          options_snapshot: Json
+          question_id: string
+          section: string
+          student_answer: string | null
+          time_spent_ms: number | null
+          topic: string | null
+          user_id: string
+        }
+        Insert: {
+          assigned_letter: string
+          created_at?: string
+          id?: string
+          is_correct?: boolean | null
+          options_snapshot: Json
+          question_id: string
+          section: string
+          student_answer?: string | null
+          time_spent_ms?: number | null
+          topic?: string | null
+          user_id: string
+        }
+        Update: {
+          assigned_letter?: string
+          created_at?: string
+          id?: string
+          is_correct?: boolean | null
+          options_snapshot?: Json
+          question_id?: string
+          section?: string
+          student_answer?: string | null
+          time_spent_ms?: number | null
+          topic?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -285,31 +369,43 @@ export type Database = {
       }
       subscription_tiers: {
         Row: {
+          bonus_sets_count: number
           created_at: string
           display_order: number
           duration_days: number
+          features: Json
           id: string
           is_active: boolean
+          max_sets: number | null
           name: string
           price_cents: number
+          slug: string | null
         }
         Insert: {
+          bonus_sets_count?: number
           created_at?: string
           display_order?: number
           duration_days: number
+          features?: Json
           id?: string
           is_active?: boolean
+          max_sets?: number | null
           name: string
           price_cents?: number
+          slug?: string | null
         }
         Update: {
+          bonus_sets_count?: number
           created_at?: string
           display_order?: number
           duration_days?: number
+          features?: Json
           id?: string
           is_active?: boolean
+          max_sets?: number | null
           name?: string
           price_cents?: number
+          slug?: string | null
         }
         Relationships: []
       }
@@ -349,6 +445,77 @@ export type Database = {
           stripe_session_id?: string | null
           tier?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      tier_set_access: {
+        Row: {
+          created_at: string
+          is_bonus: boolean
+          set_id: string
+          tier_id: string
+        }
+        Insert: {
+          created_at?: string
+          is_bonus?: boolean
+          set_id: string
+          tier_id: string
+        }
+        Update: {
+          created_at?: string
+          is_bonus?: boolean
+          set_id?: string
+          tier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tier_set_access_tier_id_fkey"
+            columns: ["tier_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_tiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tips_articles: {
+        Row: {
+          body_en: string
+          body_it: string | null
+          category: string
+          created_at: string
+          display_order: number
+          id: string
+          is_published: boolean
+          slug: string
+          title_en: string
+          title_it: string | null
+          updated_at: string
+        }
+        Insert: {
+          body_en: string
+          body_it?: string | null
+          category?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_published?: boolean
+          slug: string
+          title_en: string
+          title_it?: string | null
+          updated_at?: string
+        }
+        Update: {
+          body_en?: string
+          body_it?: string | null
+          category?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_published?: boolean
+          slug?: string
+          title_en?: string
+          title_it?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -411,6 +578,7 @@ export type Database = {
         }[]
       }
       has_active_access: { Args: { _user_id: string }; Returns: boolean }
+      has_pro_access: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
