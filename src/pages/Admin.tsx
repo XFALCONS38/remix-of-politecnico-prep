@@ -6,6 +6,10 @@ import AdminSubscribers from "@/components/admin/AdminSubscribers";
 import AdminDiscounts from "@/components/admin/AdminDiscounts";
 import AdminQuestions from "@/components/admin/AdminQuestions";
 import AdminPassages from "@/components/admin/AdminPassages";
+import AdminTiers from "@/components/admin/AdminTiers";
+import AdminAbandoned from "@/components/admin/AdminAbandoned";
+import AdminTimeAnalytics from "@/components/admin/AdminTimeAnalytics";
+import AdminTips from "@/components/admin/AdminTips";
 
 const Admin = () => {
   return (
@@ -23,6 +27,10 @@ const Admin = () => {
             <TabsTrigger value="dashboard">Analytics</TabsTrigger>
             <TabsTrigger value="questions">Questions</TabsTrigger>
             <TabsTrigger value="passages">Passages</TabsTrigger>
+            <TabsTrigger value="tiers">Tiers</TabsTrigger>
+            <TabsTrigger value="time">Time</TabsTrigger>
+            <TabsTrigger value="abandoned">Abandoned</TabsTrigger>
+            <TabsTrigger value="tips">Tips</TabsTrigger>
             <TabsTrigger value="subscribers">Subscribers</TabsTrigger>
             <TabsTrigger value="discounts">Discounts</TabsTrigger>
           </TabsList>
@@ -30,6 +38,10 @@ const Admin = () => {
           <TabsContent value="dashboard"><AdminDashboard /></TabsContent>
           <TabsContent value="questions"><AdminQuestions /></TabsContent>
           <TabsContent value="passages"><AdminPassages /></TabsContent>
+          <TabsContent value="tiers"><AdminTiers /></TabsContent>
+          <TabsContent value="time"><AdminTimeAnalytics /></TabsContent>
+          <TabsContent value="abandoned"><AdminAbandoned /></TabsContent>
+          <TabsContent value="tips"><AdminTips /></TabsContent>
           <TabsContent value="subscribers"><AdminSubscribers /></TabsContent>
           <TabsContent value="discounts"><AdminDiscounts /></TabsContent>
         </Tabs>

@@ -15,6 +15,10 @@ import Simulation from "./pages/Simulation";
 import Results from "./pages/Results";
 import Admin from "./pages/Admin";
 import PaymentSuccess from "./pages/PaymentSuccess";
+import Briefing from "./pages/Briefing";
+import SectionTransition from "./pages/SectionTransition";
+import Practice from "./pages/Practice";
+import Tips from "./pages/Tips";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +39,12 @@ const App = () => (
               <Route path="/payment-success" element={<PaymentSuccess />} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/simulation" element={<ProtectedRoute><Simulation /></ProtectedRoute>} />
+              <Route path="/exam/:setId/briefing" element={<ProtectedRoute><Briefing /></ProtectedRoute>} />
+              <Route path="/exam/briefing" element={<ProtectedRoute><Briefing /></ProtectedRoute>} />
+              <Route path="/exam/transition" element={<ProtectedRoute><SectionTransition /></ProtectedRoute>} />
+              <Route path="/practice" element={<ProtectedRoute><Practice /></ProtectedRoute>} />
+              <Route path="/tips" element={<ProtectedRoute><Tips /></ProtectedRoute>} />
+              <Route path="/tips/:slug" element={<ProtectedRoute><Tips /></ProtectedRoute>} />
               <Route path="/results/:attemptId" element={<ProtectedRoute><Results /></ProtectedRoute>} />
               <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
               <Route path="*" element={<NotFound />} />

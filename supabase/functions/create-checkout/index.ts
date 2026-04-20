@@ -92,6 +92,17 @@ serve(async (req) => {
         .eq("id", discountRecord.id);
     }
 
+    // Log abandoned-checkout candidate (recovered_at set later by webhook)
+    try {
+      await adminClient.from("abandoned_checkouts").insert({
+        email: user.email,
+        user_id: user.id,
+        tier_slug: body?.tier_slug ?? null,
+        stripe_session_id: session.id,
+        amount_cents: 1900,
+      });
+    } catch (_e) { /* best-effort */ }
+
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
