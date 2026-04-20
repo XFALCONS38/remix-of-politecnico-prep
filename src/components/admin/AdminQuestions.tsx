@@ -397,6 +397,16 @@ export default function AdminQuestions() {
               {selectedIds.size === 0 && questions.length > 0 && (
                 <Button variant="outline" size="sm" onClick={selectAllVisible}>Select all loaded</Button>
               )}
+              <Button variant="outline" size="sm" onClick={async () => {
+                const { data, error } = await supabase.functions.invoke("admin-export-questions", { body: filters });
+                if (error || data?.error) { toast({ title: "Export failed", description: data?.error || error?.message, variant: "destructive" }); return; }
+                const blob = new Blob([JSON.stringify(data.questions, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a"); a.href = url;
+                a.download = `questions_${new Date().toISOString().slice(0, 10)}.json`; a.click();
+                URL.revokeObjectURL(url);
+                toast({ title: `Exported ${data.count} questions` });
+              }}>Export JSON</Button>
               <Button variant="ghost" size="sm" onClick={loadQuestions}><RefreshCw className="h-4 w-4 mr-1" /> Refresh</Button>
             </div>
           </div>
