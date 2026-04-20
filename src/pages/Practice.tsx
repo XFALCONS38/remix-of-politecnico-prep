@@ -198,12 +198,12 @@ export default function Practice() {
 
               {q.passage && (
                 <div className="rounded-md border bg-muted/40 p-3 text-sm">
-                  <MathText>{(lang === "it" && q.passage.it) ? q.passage.it : q.passage.en}</MathText>
+                  <MathText text={(lang === "it" && q.passage.it) ? q.passage.it : q.passage.en} />
                 </div>
               )}
 
               <div className="text-base">
-                <MathText>{(lang === "it" && q.question_text_it) ? q.question_text_it : q.question_text_en}</MathText>
+                <MathText text={(lang === "it" && q.question_text_it) ? q.question_text_it : q.question_text_en} />
               </div>
 
               <div className="space-y-2">
@@ -224,7 +224,7 @@ export default function Practice() {
                     >
                       <div className="flex items-start gap-3">
                         <span className="font-bold text-sm w-6">{letter}.</span>
-                        <span className="flex-1 text-sm"><MathText>{(lang === "it" && opt.it) ? opt.it : opt.en}</MathText></span>
+                        <span className="flex-1 text-sm"><MathText text={(lang === "it" && opt.it) ? opt.it : opt.en} /></span>
                         {submitted && isCorrect && <CheckCircle2 className="h-4 w-4 text-success" />}
                         {submitted && isSel && !isCorrect && <XCircle className="h-4 w-4 text-destructive" />}
                       </div>
@@ -239,7 +239,7 @@ export default function Practice() {
                     <Lightbulb className="h-4 w-4" /> {lang === "it" ? "Soluzione" : "Solution"}
                   </div>
                   <div className="text-sm">
-                    <MathText>{(lang === "it" && q.solution_it) ? q.solution_it : q.solution_en}</MathText>
+                    <MathText text={(lang === "it" && q.solution_it) ? q.solution_it : q.solution_en} />
                   </div>
                 </div>
               )}

@@ -102,7 +102,7 @@ export default function Tips() {
           <Badge variant="secondary" className="mb-2">{CATEGORY_LABELS[active.category]?.[lang] || active.category}</Badge>
           <h1 className="text-3xl font-bold mb-4">{(lang === "it" && active.title_it) ? active.title_it : active.title_en}</h1>
           <Card><CardContent className="p-6 prose prose-sm max-w-none dark:prose-invert">
-            <MathText>{(lang === "it" && active.body_it) ? active.body_it : active.body_en}</MathText>
+            <MathText text={(lang === "it" && active.body_it) ? active.body_it : active.body_en} />
           </CardContent></Card>
         </main>
       </div>
