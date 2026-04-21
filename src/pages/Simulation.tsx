@@ -304,6 +304,70 @@ const Simulation = () => {
     });
   };
 
+  // Track per-question time: start a stopwatch when a question is shown,
+  // accumulate to cumMsRef when the user navigates away or unmounts.
+  // Also stamp first_seen_at on the very first view of each question.
+  useEffect(() => {
+    if (!lang) return;
+    const q = questions[currentIdx];
+    if (!q?.eaa_id) return;
+    const eaaId = q.eaa_id;
+
+    // Flush previous question's time
+    flushActiveTime();
+
+    // Start tracking the new one
+    activeEaaIdRef.current = eaaId;
+    activeViewStartRef.current = Date.now();
+
+    if (!seenAtRef.current[eaaId]) {
+      const ts = Date.now();
+      seenAtRef.current[eaaId] = ts;
+      // Fire-and-forget; ignore errors (RLS/network)
+      (supabase as any)
+        .from("exam_attempt_answers")
+        .update({ first_seen_at: new Date(ts).toISOString() })
+        .eq("id", eaaId)
+        .then(() => {});
+    }
+
+    // Periodically persist time_spent_ms (every 10s) so unexpected close still captures most of it
+    const persistInterval = setInterval(() => {
+      if (activeEaaIdRef.current === eaaId && activeViewStartRef.current) {
+        const cum = (cumMsRef.current[eaaId] ?? 0) + (Date.now() - activeViewStartRef.current);
+        (supabase as any)
+          .from("exam_attempt_answers")
+          .update({ time_spent_ms: cum })
+          .eq("id", eaaId)
+          .then(() => {});
+      }
+    }, 10000);
+
+    return () => {
+      clearInterval(persistInterval);
+      flushActiveTime();
+      const cum = cumMsRef.current[eaaId] ?? 0;
+      if (cum > 0) {
+        (supabase as any)
+          .from("exam_attempt_answers")
+          .update({ time_spent_ms: cum })
+          .eq("id", eaaId)
+          .then(() => {});
+      }
+    };
+  }, [currentIdx, questions, lang, flushActiveTime]);
+
+  // Flush on unmount / page hide
+  useEffect(() => {
+    const onHide = () => flushActiveTime();
+    window.addEventListener("beforeunload", onHide);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.removeEventListener("beforeunload", onHide);
+      document.removeEventListener("visibilitychange", onHide);
+    };
+  }, [flushActiveTime]);
+
   // Language + Set selection screen
   if (!lang) {
     const defaultLang = (profile as any)?.preferred_lang === "it" ? "it" : "en";
