@@ -19,6 +19,7 @@ import Briefing from "./pages/Briefing";
 import SectionTransition from "./pages/SectionTransition";
 import Practice from "./pages/Practice";
 import Tips from "./pages/Tips";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="/practice" element={<ProtectedRoute><Practice /></ProtectedRoute>} />
               <Route path="/tips" element={<ProtectedRoute><Tips /></ProtectedRoute>} />
               <Route path="/tips/:slug" element={<ProtectedRoute><Tips /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/results/:attemptId" element={<ProtectedRoute><Results /></ProtectedRoute>} />
               <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
               <Route path="*" element={<NotFound />} />

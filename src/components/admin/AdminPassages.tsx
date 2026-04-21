@@ -21,7 +21,7 @@ interface Passage {
 }
 
 export default function AdminPassages() {
-  const { sets: availableSets, reload: reloadSets } = useAvailableSets();
+  const { sets: availableSets, reload: reloadSets } = useAvailableSets({ scope: "all" });
   const [passages, setPassages] = useState<Passage[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);

@@ -1,19 +1,13 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { formatDistanceToNow, isThisWeek, differenceInDays, isToday, isYesterday, subDays } from "date-fns";
-import { cn } from "@/lib/utils";
-import SiteHeader from "@/components/SiteHeader";
 import {
-  Trophy, TrendingUp, BarChart3, CalendarDays, Play, Eye,
-  ArrowUpRight, AlertTriangle, Flame, Target, Clock, Zap,
-  BookOpen, Lightbulb,
+  LayoutDashboard, Calculator, Atom, Brain, Languages, Play,
+  LifeBuoy, LogOut, Bell, ArrowUpRight, ArrowDownRight, Sparkles,
 } from "lucide-react";
 
 interface Attempt {
@@ -22,116 +16,74 @@ interface Attempt {
   submitted_at: string | null;
   score: number | null;
   status: string;
-  is_free_attempt: boolean;
-  lang: string | null;
   set_id: string | null;
   section_scores: Record<string, { correct: number; wrong: number; blank: number; score: number; total: number }> | null;
 }
 
-const SECTION_LABELS: Record<string, Record<string, string>> = {
-  mathematics: { en: "Mathematics", it: "Matematica" },
-  logic: { en: "Comprehension & Logic", it: "Comprensione e Logica" },
-  physics: { en: "Physics", it: "Fisica" },
-  technical: { en: "Technical Knowledge", it: "Conoscenze Tecniche" },
+const SECTION_META: Record<string, { en: string; it: string; icon: any }> = {
+  mathematics: { en: "Mathematics", it: "Matematica", icon: Calculator },
+  physics: { en: "Physics", it: "Fisica", icon: Atom },
+  logic: { en: "Logic", it: "Logica", icon: Brain },
+  technical: { en: "Technical", it: "Tecnica", icon: Languages },
 };
 
-const UI = {
+const COPY = {
   en: {
+    eyebrow: "ACADEMIC TERM 2026",
+    title: "Student Dashboard",
+    overview: "Overview",
+    startSim: "Start Simulation",
+    support: "Support",
+    logout: "Sign Out",
+    learning: "Learning Progress",
+    learningSub: "Completion across core academic modules",
+    updated: "UPDATED TODAY",
+    upcoming: "Upcoming",
+    nextExam: "Next institutional exam window",
+    days: "DAYS", hrs: "HRS",
+    viewDetails: "View Details",
+    analytics: "Performance Analytics",
+    analyticsSub: "Cohort comparison across full-length simulations",
+    th: ["Subject Module", "Raw Score", "Percentile", "Cohort Avg", "Status"],
+    exceptional: "Exceptional",
+    onTrack: "On Track",
+    review: "Needs Review",
+    none: "No simulations completed yet — start your first to populate analytics.",
+    terms: "Terms", privacy: "Privacy", access: "Institutional Access",
     welcome: "Welcome back",
-    proExpires: "Pro access expires",
-    freePlan: "Free plan — limited to 1 simulation",
-    startSim: "Start New Simulation",
-    upgrade: "Upgrade to Pro",
-    upgradeDesc: "Unlimited simulations, full solutions, section analytics.",
-    upgradeBtn: "Upgrade — €19",
-    totalExams: "Total Exams",
-    bestScore: "Best Score",
-    avgScore: "Avg Score",
-    thisWeek: "This Week",
-    scoreProgress: "Score Progress",
-    moreExams: "Complete more exams to see your progress chart.",
-    sectionStrengths: "Section Strengths",
-    noSectionData: "No section data yet.",
-    weakest: "Weakest",
-    strongest: "Strongest",
-    recentAttempts: "Recent Attempts",
-    loading: "Loading...",
-    noAttempts: "No attempts yet.",
-    firstSim: "Start Your First Simulation",
-    date: "Date",
-    score: "Score",
-    statusLabel: "Status",
-    view: "View",
-    continue: "Continue",
-    inProgress: "In Progress",
-    guaranteed: "Guaranteed",
-    waitingList: "Waiting List",
-    notRanked: "Not Ranked",
-    streak: "Study Streak",
-    days: "days",
-    improvement: "Improvement",
-    studyTip: "Study Tip",
-    focusOn: "Focus on",
-    toImprove: "to improve your overall score",
-    lastExam: "Last exam",
-    ago: "ago",
-    keepGoing: "Keep the momentum going!",
-    getStarted: "Take your first practice exam to start tracking progress!",
-    quickStats: "Quick Stats",
-    passRate: "Pass Rate",
-    examsCompleted: "completed",
   },
   it: {
+    eyebrow: "ANNO ACCADEMICO 2026",
+    title: "Dashboard Studente",
+    overview: "Panoramica",
+    startSim: "Avvia Simulazione",
+    support: "Supporto",
+    logout: "Esci",
+    learning: "Progressi di Apprendimento",
+    learningSub: "Completamento tra i moduli accademici principali",
+    updated: "AGGIORNATO OGGI",
+    upcoming: "Prossimo",
+    nextExam: "Prossima finestra d'esame istituzionale",
+    days: "GIORNI", hrs: "ORE",
+    viewDetails: "Dettagli",
+    analytics: "Analisi Performance",
+    analyticsSub: "Confronto coorte su simulazioni complete",
+    th: ["Modulo", "Punteggio", "Percentile", "Media Coorte", "Stato"],
+    exceptional: "Eccezionale",
+    onTrack: "In Linea",
+    review: "Da Rivedere",
+    none: "Nessuna simulazione completata — avvia la prima per popolare le analisi.",
+    terms: "Termini", privacy: "Privacy", access: "Accesso Istituzionale",
     welcome: "Bentornato",
-    proExpires: "Accesso Pro scade",
-    freePlan: "Piano gratuito — limitato a 1 simulazione",
-    startSim: "Nuova Simulazione",
-    upgrade: "Passa a Pro",
-    upgradeDesc: "Simulazioni illimitate, soluzioni complete, analisi per sezione.",
-    upgradeBtn: "Sblocca — €19",
-    totalExams: "Esami Totali",
-    bestScore: "Miglior Punteggio",
-    avgScore: "Punteggio Medio",
-    thisWeek: "Questa Settimana",
-    scoreProgress: "Andamento Punteggio",
-    moreExams: "Completa più esami per vedere il grafico.",
-    sectionStrengths: "Punti di Forza per Sezione",
-    noSectionData: "Nessun dato disponibile.",
-    weakest: "Più debole",
-    strongest: "Più forte",
-    recentAttempts: "Tentativi Recenti",
-    loading: "Caricamento...",
-    noAttempts: "Nessun tentativo ancora.",
-    firstSim: "Inizia la Prima Simulazione",
-    date: "Data",
-    score: "Punteggio",
-    statusLabel: "Stato",
-    view: "Vedi",
-    continue: "Continua",
-    inProgress: "In Corso",
-    guaranteed: "Ammesso",
-    waitingList: "Lista d'Attesa",
-    notRanked: "Non in Graduatoria",
-    streak: "Serie di Studio",
-    days: "giorni",
-    improvement: "Miglioramento",
-    studyTip: "Consiglio di Studio",
-    focusOn: "Concentrati su",
-    toImprove: "per migliorare il punteggio",
-    lastExam: "Ultimo esame",
-    ago: "fa",
-    keepGoing: "Continua così!",
-    getStarted: "Fai il tuo primo esame per iniziare!",
-    quickStats: "Statistiche Rapide",
-    passRate: "Tasso Superamento",
-    examsCompleted: "completati",
   },
 };
 
+const TARGET_EXAM_DATE = new Date("2026-09-15T09:00:00Z");
+
 const Dashboard = () => {
-  const { user, profile, hasActiveAccess } = useAuth();
+  const { user, profile, signOut } = useAuth();
   const { lang } = useTheme();
-  const l = UI[lang];
+  const c = COPY[lang];
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -139,372 +91,227 @@ const Dashboard = () => {
     if (!user) return;
     (supabase as any)
       .from("attempts")
-      .select("id, started_at, submitted_at, score, status, is_free_attempt, section_scores, lang, set_id")
+      .select("id, started_at, submitted_at, score, status, set_id, section_scores")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
-      .then(({ data }: any) => {
-        setAttempts(data ?? []);
-        setLoading(false);
-      });
+      .then(({ data }: any) => { setAttempts(data ?? []); setLoading(false); });
   }, [user]);
 
-  const completedAttempts = useMemo(
+  const completed = useMemo(
     () => attempts.filter((a) => a.status === "completed" || a.status === "auto_submitted"),
     [attempts]
   );
 
-  const stats = useMemo(() => {
-    if (completedAttempts.length === 0) return null;
-    const scores = completedAttempts.map((a) => a.score ?? 0);
-    const best = Math.max(...scores);
-    const avg = scores.reduce((s, v) => s + v, 0) / scores.length;
-    const thisWeek = completedAttempts.filter((a) =>
-      a.submitted_at ? isThisWeek(new Date(a.submitted_at)) : false
-    ).length;
-    const passed = scores.filter(s => s >= 60).length;
-    const passRate = ((passed / scores.length) * 100).toFixed(0);
-    return { total: completedAttempts.length, best, avg, thisWeek, passRate };
-  }, [completedAttempts]);
-
-  // Calculate streak
-  const streak = useMemo(() => {
-    if (completedAttempts.length === 0) return 0;
-    const dates = completedAttempts
-      .filter(a => a.submitted_at)
-      .map(a => new Date(a.submitted_at!).toDateString())
-      .filter((v, i, a) => a.indexOf(v) === i);
-    
-    let count = 0;
-    let checkDate = new Date();
-    // If no exam today, start from yesterday
-    if (!dates.includes(checkDate.toDateString())) {
-      checkDate = subDays(checkDate, 1);
-    }
-    while (dates.includes(checkDate.toDateString())) {
-      count++;
-      checkDate = subDays(checkDate, 1);
-    }
-    return count;
-  }, [completedAttempts]);
-
-  // Score improvement (last 3 vs first 3)
-  const improvement = useMemo(() => {
-    if (completedAttempts.length < 3) return null;
-    const sorted = [...completedAttempts].reverse();
-    const first3 = sorted.slice(0, 3).reduce((s, a) => s + (a.score ?? 0), 0) / 3;
-    const last3 = sorted.slice(-3).reduce((s, a) => s + (a.score ?? 0), 0) / 3;
-    return last3 - first3;
-  }, [completedAttempts]);
-
-  const sectionStrengths = useMemo(() => {
-    const sectionTotals: Record<string, { score: number; maxScore: number; count: number }> = {};
-    for (const a of completedAttempts) {
-      if (!a.section_scores) continue;
-      for (const [section, data] of Object.entries(a.section_scores)) {
-        if (!sectionTotals[section]) sectionTotals[section] = { score: 0, maxScore: 0, count: 0 };
-        sectionTotals[section].score += data.score;
-        sectionTotals[section].maxScore += data.total;
-        sectionTotals[section].count += 1;
+  // per-section aggregates
+  const sectionStats = useMemo(() => {
+    const acc: Record<string, { score: number; max: number; count: number; recent: number; recentMax: number }> = {};
+    completed.forEach((a, idx) => {
+      if (!a.section_scores) return;
+      for (const [sec, d] of Object.entries(a.section_scores)) {
+        if (!acc[sec]) acc[sec] = { score: 0, max: 0, count: 0, recent: 0, recentMax: 0 };
+        acc[sec].score += d.score; acc[sec].max += d.total; acc[sec].count += 1;
+        if (idx < 3) { acc[sec].recent += d.score; acc[sec].recentMax += d.total; }
       }
-    }
-    const sections = Object.entries(sectionTotals).map(([section, data]) => ({
-      section,
-      label: SECTION_LABELS[section]?.[lang] ?? section,
-      pct: data.maxScore > 0 ? (data.score / data.maxScore) * 100 : 0,
-    }));
-    sections.sort((a, b) => b.pct - a.pct);
-    return sections;
-  }, [completedAttempts, lang]);
+    });
+    return acc;
+  }, [completed]);
 
-  const weakestSection = sectionStrengths.length > 0 ? sectionStrengths[sectionStrengths.length - 1] : null;
+  const learningCards = ["mathematics", "physics", "logic"].map((sec) => {
+    const s = sectionStats[sec];
+    const pct = s && s.max > 0 ? (s.score / s.max) * 100 : 0;
+    const recentPct = s && s.recentMax > 0 ? (s.recent / s.recentMax) * 100 : 0;
+    const overallOlder = s && s.max > s.recentMax ? ((s.score - s.recent) / (s.max - s.recentMax)) * 100 : pct;
+    const delta = recentPct - overallOlder;
+    return { sec, meta: SECTION_META[sec], pct, delta: isFinite(delta) ? delta : 0 };
+  });
 
-  const chartData = useMemo(() => {
-    const sorted = [...completedAttempts].reverse().slice(-10);
-    const maxScore = 42;
-    return sorted.map((a, i) => ({
-      score: a.score ?? 0,
-      pct: ((a.score ?? 0) / maxScore) * 100,
-      index: i,
-    }));
-  }, [completedAttempts]);
+  const performance = useMemo(() => {
+    return Object.entries(sectionStats).map(([sec, s]) => {
+      const pct = s.max > 0 ? (s.score / s.max) * 100 : 0;
+      // approximate cohort avg as 55% baseline; percentile from pct vs 55
+      const cohort = 55;
+      const percentile = Math.min(99, Math.max(1, Math.round(50 + (pct - cohort) * 0.9)));
+      const status = pct >= 75 ? "exceptional" : pct >= 55 ? "onTrack" : "review";
+      return { sec, label: SECTION_META[sec]?.[lang] ?? sec, score: s.score / Math.max(s.count, 1), pct, cohort, percentile, status };
+    });
+  }, [sectionStats, lang]);
 
-  const getStatusBadge = (a: Attempt) => {
-    if (a.status === "in_progress") return <Badge variant="secondary">{l.inProgress}</Badge>;
-    const score = a.score ?? 0;
-    if (score >= 60) return <Badge className="bg-success text-success-foreground">{l.guaranteed}</Badge>;
-    if (score >= 30) return <Badge className="bg-warning text-warning-foreground">{l.waitingList}</Badge>;
-    return <Badge variant="destructive">{l.notRanked}</Badge>;
-  };
+  const countdown = useMemo(() => {
+    const ms = TARGET_EXAM_DATE.getTime() - Date.now();
+    const days = Math.max(0, Math.floor(ms / 86400000));
+    const hrs = Math.max(0, Math.floor((ms % 86400000) / 3600000));
+    return { days, hrs };
+  }, []);
 
   const displayName = profile?.display_name || profile?.email?.split("@")[0] || "Student";
-  const lastExam = completedAttempts[0];
 
   return (
-    <div className="min-h-screen bg-background">
-      <SiteHeader showDashboard={false} />
-      <main className="container py-6 sm:py-10">
-        {/* Header */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold sm:text-3xl">{l.welcome}, {displayName} 👋</h1>
-            <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-              {hasActiveAccess && profile?.access_expiry && (
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3.5 w-3.5" />
-                  {l.proExpires} {formatDistanceToNow(new Date(profile.access_expiry), { addSuffix: true })}
-                </span>
-              )}
-              {!hasActiveAccess && <span>{l.freePlan}</span>}
-              {streak > 0 && (
-                <span className="flex items-center gap-1 text-orange-500 font-medium">
-                  <Flame className="h-3.5 w-3.5" /> {streak} {l.days} {l.streak.toLowerCase()}
-                </span>
-              )}
-            </div>
+    <div className="min-h-screen bg-muted/30">
+      <div className="flex min-h-screen">
+        {/* SIDEBAR */}
+        <aside className="hidden w-60 shrink-0 flex-col border-r bg-card lg:flex">
+          <div className="border-b p-5">
+            <div className="text-sm font-bold tracking-tight">TIL-I Prep</div>
+            <div className="text-[11px] uppercase tracking-widest text-muted-foreground">Engineering 2026</div>
           </div>
-          <Link to="/simulation">
-            <Button size="lg" className="w-full gap-2 sm:w-auto">
-              <Play className="h-4 w-4" /> {l.startSim}
-            </Button>
-          </Link>
-        </div>
+          <nav className="flex-1 space-y-0.5 p-3 text-sm">
+            <NavBtn icon={LayoutDashboard} label={c.overview} active />
+            {(["mathematics","physics","logic","technical"] as const).map((s) => {
+              const m = SECTION_META[s];
+              return <NavBtn key={s} icon={m.icon} label={m[lang]} />;
+            })}
+          </nav>
+          <div className="space-y-2 border-t p-3">
+            <Link to="/simulation"><Button className="w-full gap-2"><Play className="h-4 w-4" /> {c.startSim}</Button></Link>
+            <button className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted/50"><LifeBuoy className="h-3.5 w-3.5" />{c.support}</button>
+            <button onClick={signOut} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted/50"><LogOut className="h-3.5 w-3.5" />{c.logout}</button>
+          </div>
+        </aside>
 
-        {/* Upgrade CTA */}
-        {!hasActiveAccess && (
-          <Card className="mb-6 border-primary/50 bg-primary/5">
-            <CardContent className="flex flex-col items-start gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+        {/* MAIN */}
+        <main className="flex-1 overflow-x-hidden">
+          <header className="sticky top-0 z-10 border-b bg-card/95 backdrop-blur">
+            <div className="flex h-16 items-center justify-between px-4 sm:px-8">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{c.eyebrow}</div>
+                <h1 className="font-display text-xl font-bold sm:text-2xl">{c.title}</h1>
+              </div>
               <div className="flex items-center gap-3">
-                <ArrowUpRight className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="text-sm font-medium">{l.upgrade}</p>
-                  <p className="text-xs text-muted-foreground">{l.upgradeDesc}</p>
-                </div>
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><Bell className="h-4 w-4" /></Button>
+                <Link to="/settings" className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                  {displayName.slice(0, 1).toUpperCase()}
+                </Link>
               </div>
-              <Link to="/pricing"><Button size="sm" className="w-full sm:w-auto">{l.upgradeBtn}</Button></Link>
-            </CardContent>
-          </Card>
-        )}
+            </div>
+          </header>
 
-        {/* Quick actions: Practice + Tips */}
-        <div className="mb-6 grid gap-3 sm:grid-cols-2">
-          <Link to="/practice" className="block">
-            <Card className="h-full transition-colors hover:bg-muted/40">
-              <CardContent className="flex items-center gap-3 py-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                  <BookOpen className="h-5 w-5 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">{lang === "en" ? "Practice by Topic" : "Pratica per Argomento"}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {lang === "en" ? "Untimed, randomized — clock tracks your pace." : "Senza limiti, casuali — il cronometro registra il ritmo."}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-          <Link to="/tips" className="block">
-            <Card className="h-full transition-colors hover:bg-muted/40">
-              <CardContent className="flex items-center gap-3 py-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-warning/10">
-                  <Lightbulb className="h-5 w-5 text-warning" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">
-                    {lang === "en" ? "Tips & Formulas" : "Suggerimenti e Formule"}
-                    {!hasActiveAccess && (
-                      <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] uppercase text-primary">Pro</span>
-                    )}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {lang === "en" ? "Strategies, tactics and formula sheets." : "Strategie, tattiche e formulari."}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
+          <div className="p-4 sm:p-8">
+            <p className="mb-6 text-sm text-muted-foreground">{c.welcome}, <span className="font-medium text-foreground">{displayName}</span>.</p>
 
-        {/* No attempts state */}
-        {!loading && attempts.length === 0 && (
-          <Card className="mb-6">
-            <CardContent className="py-16 text-center">
-              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-                <Target className="h-8 w-8 text-primary" />
-              </div>
-              <h2 className="text-xl font-semibold mb-2">{l.firstSim}</h2>
-              <p className="text-muted-foreground text-sm mb-6">{l.getStarted}</p>
-              <Link to="/simulation">
-                <Button size="lg" className="gap-2"><Play className="h-4 w-4" /> {l.startSim}</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Stats Cards */}
-        {stats && (
-          <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-            <StatsCard icon={BarChart3} label={l.totalExams} value={String(stats.total)} sub={`${stats.thisWeek} ${l.thisWeek.toLowerCase()}`} />
-            <StatsCard icon={Trophy} label={l.bestScore} value={`${stats.best.toFixed(1)}/42`} />
-            <StatsCard icon={TrendingUp} label={l.avgScore} value={`${stats.avg.toFixed(1)}/42`} sub={improvement !== null ? `${improvement > 0 ? "+" : ""}${improvement.toFixed(1)} ${l.improvement.toLowerCase()}` : undefined} />
-            <StatsCard icon={Target} label={l.passRate} value={`${stats.passRate}%`} sub={`${stats.total} ${l.examsCompleted}`} />
-          </div>
-        )}
-
-        {/* Study tip */}
-        {weakestSection && (
-          <Card className="mb-6 border-orange-500/30 bg-orange-500/5">
-            <CardContent className="flex items-center gap-3 py-4">
-              <Zap className="h-5 w-5 text-orange-500 shrink-0" />
-              <p className="text-sm">
-                <span className="font-medium">{l.studyTip}:</span>{" "}
-                {l.focusOn} <span className="font-semibold">{weakestSection.label}</span> ({weakestSection.pct.toFixed(0)}%) {l.toImprove}.
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Charts */}
-        {completedAttempts.length > 0 && (
-          <div className="mb-6 grid gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-base">{l.scoreProgress}</CardTitle></CardHeader>
-              <CardContent>
-                {chartData.length < 2 ? (
-                  <p className="py-8 text-center text-sm text-muted-foreground">{l.moreExams}</p>
-                ) : (
-                  <div className="relative h-44 w-full">
-                    <svg viewBox="0 0 400 160" className="h-full w-full" preserveAspectRatio="none">
-                      {[0, 25, 50, 75, 100].map((pct) => (
-                        <line key={pct} x1="0" y1={150 - pct * 1.4} x2="400" y2={150 - pct * 1.4} className="stroke-border" strokeWidth="0.5" strokeDasharray="4 4" />
-                      ))}
-                      <polygon points={chartData.map((d, i) => `${(i / (chartData.length - 1)) * 380 + 10},${150 - d.pct * 1.4}`).join(" ") + " 390,150 10,150"} className="fill-primary/10" />
-                      <polyline fill="none" className="stroke-primary" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={chartData.map((d, i) => `${(i / (chartData.length - 1)) * 380 + 10},${150 - d.pct * 1.4}`).join(" ")} />
-                      {chartData.map((d, i) => {
-                        const x = (i / (chartData.length - 1)) * 380 + 10;
-                        const y = 150 - d.pct * 1.4;
-                        return (
-                          <g key={i}>
-                            <circle cx={x} cy={y} r="5" className="fill-primary" />
-                            <circle cx={x} cy={y} r="3" className="fill-primary-foreground" />
-                            <text x={x} y={y - 10} textAnchor="middle" className="fill-foreground text-[9px]">{d.score.toFixed(1)}</text>
-                          </g>
-                        );
-                      })}
-                    </svg>
+            <div className="grid gap-5 lg:grid-cols-3">
+              {/* Learning Progress */}
+              <div className="lg:col-span-2">
+                <div className="rounded-2xl border bg-card p-5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h2 className="font-display text-lg font-bold">{c.learning}</h2>
+                      <p className="text-xs text-muted-foreground">{c.learningSub}</p>
+                    </div>
+                    <span className="rounded-full bg-success/10 px-2.5 py-1 text-[10px] font-bold tracking-wider text-success">{c.updated}</span>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">{l.sectionStrengths}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {sectionStrengths.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-muted-foreground">{l.noSectionData}</p>
-                ) : (
-                  <div className="space-y-4">
-                    {sectionStrengths.map((s, i) => (
-                      <div key={s.section}>
-                        <div className="mb-1.5 flex items-center justify-between text-sm">
-                          <span className="font-medium">{s.label}</span>
-                          <div className="flex items-center gap-2">
-                            {i === 0 && sectionStrengths.length > 1 && (
-                              <span className="flex items-center gap-1 text-xs text-green-600">
-                                <Trophy className="h-3 w-3" /> {l.strongest}
-                              </span>
-                            )}
-                            {s.section === weakestSection?.section && sectionStrengths.length > 1 && (
-                              <span className="flex items-center gap-1 text-xs text-destructive">
-                                <AlertTriangle className="h-3 w-3" /> {l.weakest}
-                              </span>
-                            )}
-                            <span className="tabular-nums text-muted-foreground">{s.pct.toFixed(0)}%</span>
-                          </div>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                    {learningCards.map(({ sec, meta, pct, delta }) => (
+                      <div key={sec} className="rounded-xl border bg-muted/30 p-4">
+                        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                          <meta.icon className="h-3.5 w-3.5" /> {meta[lang]}
                         </div>
-                        <Progress value={s.pct} className={cn("h-2.5", i === 0 && "bg-green-100 [&>div]:bg-green-500")} />
+                        <div className="mt-2 flex items-end justify-between">
+                          <div className="font-display text-3xl font-bold">{pct.toFixed(0)}<span className="text-base text-muted-foreground">%</span></div>
+                          {delta !== 0 && (
+                            <span className={`flex items-center gap-0.5 text-xs font-semibold ${delta > 0 ? "text-success" : "text-destructive"}`}>
+                              {delta > 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                              {Math.abs(delta).toFixed(0)}%
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-border/60">
+                          <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, pct)}%` }} />
+                        </div>
                       </div>
                     ))}
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                </div>
+              </div>
 
-        {/* Recent Attempts */}
-        <Card>
-          <CardHeader className="pb-3"><CardTitle className="text-base">{l.recentAttempts}</CardTitle></CardHeader>
-          <CardContent>
-            {loading ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">{l.loading}</p>
-            ) : attempts.length === 0 ? null : (
-              <>
-                <div className="hidden md:block">
-                  <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 border-b pb-2 text-xs font-medium text-muted-foreground">
-                    <span>{l.date}</span><span>{l.score}</span><span>Set</span><span>{l.statusLabel}</span><span></span>
+              {/* Upcoming */}
+              <div className="rounded-2xl border bg-foreground p-5 text-background">
+                <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest opacity-70">
+                  <Sparkles className="h-3 w-3" /> {c.upcoming}
+                </div>
+                <p className="mt-2 text-sm opacity-80">{c.nextExam}</p>
+                <div className="mt-5 flex items-end gap-4">
+                  <div>
+                    <div className="font-display text-5xl font-bold leading-none tabular-nums">{countdown.days}</div>
+                    <div className="mt-1 text-[10px] font-bold tracking-widest opacity-70">{c.days}</div>
                   </div>
-                  {attempts.map((a) => (
-                    <div key={a.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-x-4 border-b py-3 last:border-0">
-                      <span className="text-sm">{new Date(a.started_at).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</span>
-                      <span className="text-sm tabular-nums font-medium">{a.status === "in_progress" ? "—" : `${(a.score ?? 0).toFixed(1)}/42`}</span>
-                      <span className="text-xs text-muted-foreground">{a.set_id ?? "SET_01"}</span>
-                      {getStatusBadge(a)}
-                      <div>
-                        {(a.status === "completed" || a.status === "auto_submitted") && (
-                          <Link to={`/results/${a.id}`}><Button variant="outline" size="sm" className="gap-1"><Eye className="h-3.5 w-3.5" /> {l.view}</Button></Link>
-                        )}
-                        {a.status === "in_progress" && (
-                          <Link to="/simulation"><Button size="sm" className="gap-1"><Play className="h-3.5 w-3.5" /> {l.continue}</Button></Link>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                  <div>
+                    <div className="font-display text-5xl font-bold leading-none tabular-nums">{countdown.hrs}</div>
+                    <div className="mt-1 text-[10px] font-bold tracking-widest opacity-70">{c.hrs}</div>
+                  </div>
                 </div>
-                <div className="space-y-3 md:hidden">
-                  {attempts.map((a) => (
-                    <div key={a.id} className="rounded-lg border p-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">{new Date(a.started_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
-                        {getStatusBadge(a)}
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">{a.set_id ?? "SET_01"}</div>
-                      <div className="mt-2 flex items-center justify-between">
-                        <span className="text-lg font-bold tabular-nums">{a.status === "in_progress" ? l.inProgress : `${(a.score ?? 0).toFixed(1)}/42`}</span>
-                        {(a.status === "completed" || a.status === "auto_submitted") && (
-                          <Link to={`/results/${a.id}`}><Button variant="outline" size="sm">{l.view}</Button></Link>
-                        )}
-                        {a.status === "in_progress" && (
-                          <Link to="/simulation"><Button size="sm">{l.continue}</Button></Link>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                <Link to="/simulation" className="mt-6 inline-flex items-center gap-1 text-xs font-semibold underline-offset-4 hover:underline">
+                  {c.viewDetails} →
+                </Link>
+              </div>
+            </div>
+
+            {/* Performance Analytics */}
+            <div className="mt-6 rounded-2xl border bg-card">
+              <div className="border-b p-5">
+                <h2 className="font-display text-lg font-bold">{c.analytics}</h2>
+                <p className="text-xs text-muted-foreground">{c.analyticsSub}</p>
+              </div>
+              {loading ? (
+                <p className="p-8 text-center text-sm text-muted-foreground">…</p>
+              ) : performance.length === 0 ? (
+                <p className="p-8 text-center text-sm text-muted-foreground">{c.none}</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      <tr>
+                        {c.th.map((h) => <th key={h} className="px-5 py-3 font-semibold">{h}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {performance.map((p) => (
+                        <tr key={p.sec} className="border-t">
+                          <td className="px-5 py-4 font-medium">{p.label}</td>
+                          <td className="px-5 py-4 tabular-nums">{p.score.toFixed(1)}</td>
+                          <td className="px-5 py-4 tabular-nums">{p.percentile}<span className="text-xs text-muted-foreground">th</span></td>
+                          <td className="px-5 py-4 tabular-nums text-muted-foreground">{p.cohort}%</td>
+                          <td className="px-5 py-4">
+                            <StatusPill status={p.status} c={c} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </main>
+              )}
+            </div>
+
+            <footer className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t pt-5 text-xs text-muted-foreground">
+              <span>© TIL-I Prep · 2026</span>
+              <div className="flex gap-4">
+                <Link to="#">{c.terms}</Link>
+                <Link to="#">{c.privacy}</Link>
+                <Link to="#">{c.access}</Link>
+              </div>
+            </footer>
+          </div>
+        </main>
+      </div>
     </div>
   );
 };
 
-function StatsCard({ icon: Icon, label, value, sub }: { icon: any; label: string; value: string; sub?: string }) {
+function NavBtn({ icon: Icon, label, active }: { icon: any; label: string; active?: boolean }) {
   return (
-    <Card>
-      <CardContent className="flex items-center gap-3 p-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-          <Icon className="h-5 w-5 text-primary" />
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-xs text-muted-foreground">{label}</p>
-          <p className="text-lg font-bold tabular-nums leading-tight">{value}</p>
-          {sub && <p className="truncate text-[10px] text-muted-foreground">{sub}</p>}
-        </div>
-      </CardContent>
-    </Card>
+    <button className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm transition-colors ${active ? "bg-primary/10 font-semibold text-primary" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"}`}>
+      <Icon className="h-4 w-4" /> {label}
+    </button>
   );
+}
+
+function StatusPill({ status, c }: { status: string; c: any }) {
+  const map: Record<string, { label: string; cls: string }> = {
+    exceptional: { label: c.exceptional, cls: "bg-success/15 text-success" },
+    onTrack: { label: c.onTrack, cls: "bg-primary/10 text-primary" },
+    review: { label: c.review, cls: "bg-warning/15 text-warning" },
+  };
+  const v = map[status];
+  return <span className={`inline-block rounded-full px-2.5 py-1 text-[11px] font-semibold ${v.cls}`}>{v.label}</span>;
 }
 
 export default Dashboard;

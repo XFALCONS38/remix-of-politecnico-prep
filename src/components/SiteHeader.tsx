@@ -2,7 +2,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
-import { Moon, Sun, LogOut, ShieldCheck, GraduationCap, BookOpen, Lightbulb, LayoutDashboard } from "lucide-react";
+import { Moon, Sun, LogOut, ShieldCheck, GraduationCap, BookOpen, Lightbulb, LayoutDashboard, Settings as SettingsIcon } from "lucide-react";
 
 interface SiteHeaderProps {
   showAuth?: boolean;
@@ -57,6 +57,16 @@ const SiteHeader = ({ showAuth = true, showDashboard = false }: SiteHeaderProps)
                 }
               >
                 <Lightbulb className="h-4 w-4" /> {lang === "en" ? "Tips" : "Suggerimenti"}
+              </NavLink>
+              <NavLink
+                to="/settings"
+                className={({ isActive }) =>
+                  `flex items-center gap-1.5 rounded-md px-2.5 py-1.5 transition-colors ${
+                    isActive ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:text-foreground"
+                  }`
+                }
+              >
+                <SettingsIcon className="h-4 w-4" /> {lang === "en" ? "Settings" : "Impostazioni"}
               </NavLink>
             </nav>
           )}
