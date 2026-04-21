@@ -142,7 +142,18 @@ const Simulation = () => {
     setQuestions((prev) =>
       prev.map((q) => (q.eaa_id === eaaId ? { ...q, student_answer: letter } : q))
     );
-    await (supabase as any).from("exam_attempt_answers").update({ student_answer: letter }).eq("id", eaaId);
+    // Flush current time so the answer captures the time spent up to this moment
+    if (activeEaaIdRef.current === eaaId && activeViewStartRef.current) {
+      const delta = Date.now() - activeViewStartRef.current;
+      cumMsRef.current[eaaId] = (cumMsRef.current[eaaId] ?? 0) + delta;
+      activeViewStartRef.current = Date.now();
+    }
+    const update: Record<string, unknown> = {
+      student_answer: letter,
+      time_spent_ms: cumMsRef.current[eaaId] ?? 0,
+      answered_at: letter ? new Date().toISOString() : null,
+    };
+    await (supabase as any).from("exam_attempt_answers").update(update).eq("id", eaaId);
   }, []);
 
   // Arrow key + number key navigation (within current section only)
