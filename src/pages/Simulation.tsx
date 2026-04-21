@@ -90,6 +90,24 @@ const Simulation = () => {
   const [error, setError] = useState<string | null>(null);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
 
+  // Per-question timing: track when each eaa_id was first seen + cumulative ms spent
+  const seenAtRef = useRef<Record<string, number>>({});
+  const cumMsRef = useRef<Record<string, number>>({});
+  const activeViewStartRef = useRef<number | null>(null);
+  const activeEaaIdRef = useRef<string | null>(null);
+
+  // Flush time spent on the currently-viewed question to the in-memory accumulator
+  const flushActiveTime = useCallback(() => {
+    const eaaId = activeEaaIdRef.current;
+    const start = activeViewStartRef.current;
+    if (eaaId && start) {
+      const delta = Date.now() - start;
+      cumMsRef.current[eaaId] = (cumMsRef.current[eaaId] ?? 0) + delta;
+    }
+    activeViewStartRef.current = null;
+    activeEaaIdRef.current = null;
+  }, []);
+
   // Auto-pick the first available set when the list loads
   useEffect(() => {
     if (availableSets.length > 0 && !availableSets.includes(selectedSet)) {
