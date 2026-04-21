@@ -577,6 +577,13 @@ export type Database = {
           set_id: string
         }[]
       }
+      get_user_allowed_sets: {
+        Args: { _user_id: string }
+        Returns: {
+          is_bonus: boolean
+          set_id: string
+        }[]
+      }
       has_active_access: { Args: { _user_id: string }; Returns: boolean }
       has_pro_access: { Args: { _user_id: string }; Returns: boolean }
       has_role: {
