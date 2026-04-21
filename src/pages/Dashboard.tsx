@@ -13,6 +13,7 @@ import SiteHeader from "@/components/SiteHeader";
 import {
   Trophy, TrendingUp, BarChart3, CalendarDays, Play, Eye,
   ArrowUpRight, AlertTriangle, Flame, Target, Clock, Zap,
+  BookOpen, Lightbulb,
 } from "lucide-react";
 
 interface Attempt {
@@ -283,6 +284,45 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Quick actions: Practice + Tips */}
+        <div className="mb-6 grid gap-3 sm:grid-cols-2">
+          <Link to="/practice" className="block">
+            <Card className="h-full transition-colors hover:bg-muted/40">
+              <CardContent className="flex items-center gap-3 py-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <BookOpen className="h-5 w-5 text-primary" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">{lang === "en" ? "Practice by Topic" : "Pratica per Argomento"}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {lang === "en" ? "Untimed, randomized — clock tracks your pace." : "Senza limiti, casuali — il cronometro registra il ritmo."}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+          <Link to="/tips" className="block">
+            <Card className="h-full transition-colors hover:bg-muted/40">
+              <CardContent className="flex items-center gap-3 py-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-warning/10">
+                  <Lightbulb className="h-5 w-5 text-warning" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">
+                    {lang === "en" ? "Tips & Formulas" : "Suggerimenti e Formule"}
+                    {!hasActiveAccess && (
+                      <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] uppercase text-primary">Pro</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {lang === "en" ? "Strategies, tactics and formula sheets." : "Strategie, tattiche e formulari."}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
 
         {/* No attempts state */}
         {!loading && attempts.length === 0 && (

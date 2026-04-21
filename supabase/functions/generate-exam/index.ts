@@ -123,6 +123,58 @@ serve(async (req) => {
       // default free
     }
 
+    // --- Tier validation: ensure user's active tier (or free tier) allows this set ---
+    // Resolve the user's effective tier slug.
+    let effectiveTierSlug: string | null = null;
+    const { data: activeSub } = await supabase
+      .from("subscriptions")
+      .select("tier, status, access_expiry")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .gt("access_expiry", new Date().toISOString())
+      .order("access_expiry", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (activeSub?.tier) {
+      // `tier` may be either a slug or a name; resolve to a slug
+      const { data: tierByMatch } = await supabase
+        .from("subscription_tiers")
+        .select("slug, name")
+        .or(`slug.eq.${activeSub.tier},name.eq.${activeSub.tier}`)
+        .maybeSingle();
+      effectiveTierSlug = tierByMatch?.slug ?? null;
+    }
+    if (!effectiveTierSlug) effectiveTierSlug = "free";
+
+    // Look up the tier id then check tier_set_access. If the tier has NO rows
+    // configured at all, fall back to allowing the request (back-compat).
+    const { data: tierRow } = await supabase
+      .from("subscription_tiers")
+      .select("id")
+      .eq("slug", effectiveTierSlug)
+      .maybeSingle();
+
+    if (tierRow?.id) {
+      const { data: allowedRows, count: allowedCount } = await supabase
+        .from("tier_set_access")
+        .select("set_id", { count: "exact" })
+        .eq("tier_id", tierRow.id);
+
+      if ((allowedCount ?? 0) > 0) {
+        const allowed = new Set((allowedRows || []).map((r: any) => r.set_id));
+        if (!allowed.has(setId)) {
+          return new Response(
+            JSON.stringify({
+              error: `Set ${setId} is not included in your current plan.`,
+              code: "TIER_FORBIDDEN",
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 403 },
+          );
+        }
+      }
+    }
+
     // Check for existing in-progress attempt
     const { data: existingAttempt } = await supabase
       .from("attempts")
