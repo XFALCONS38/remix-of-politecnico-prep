@@ -1,8 +1,8 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
-import { Moon, Sun, LogOut, ShieldCheck, GraduationCap } from "lucide-react";
+import { Moon, Sun, LogOut, ShieldCheck, GraduationCap, BookOpen, Lightbulb, LayoutDashboard } from "lucide-react";
 
 interface SiteHeaderProps {
   showAuth?: boolean;
@@ -22,9 +22,45 @@ const SiteHeader = ({ showAuth = true, showDashboard = false }: SiteHeaderProps)
   return (
     <header className="sticky top-0 z-40 border-b bg-card/95 backdrop-blur">
       <div className="container flex h-14 items-center justify-between gap-2">
-        <Link to="/" className="text-xl font-bold tracking-tight text-foreground">
-          TILPrep
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link to="/" className="text-xl font-bold tracking-tight text-foreground">
+            TILPrep
+          </Link>
+          {user && (!isAdmin || viewMode === "student") && (
+            <nav className="hidden md:flex items-center gap-1 text-sm">
+              <NavLink
+                to="/dashboard"
+                className={({ isActive }) =>
+                  `flex items-center gap-1.5 rounded-md px-2.5 py-1.5 transition-colors ${
+                    isActive ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:text-foreground"
+                  }`
+                }
+              >
+                <LayoutDashboard className="h-4 w-4" /> {lang === "en" ? "Dashboard" : "Dashboard"}
+              </NavLink>
+              <NavLink
+                to="/practice"
+                className={({ isActive }) =>
+                  `flex items-center gap-1.5 rounded-md px-2.5 py-1.5 transition-colors ${
+                    isActive ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:text-foreground"
+                  }`
+                }
+              >
+                <BookOpen className="h-4 w-4" /> {lang === "en" ? "Practice" : "Pratica"}
+              </NavLink>
+              <NavLink
+                to="/tips"
+                className={({ isActive }) =>
+                  `flex items-center gap-1.5 rounded-md px-2.5 py-1.5 transition-colors ${
+                    isActive ? "bg-muted text-foreground font-medium" : "text-muted-foreground hover:text-foreground"
+                  }`
+                }
+              >
+                <Lightbulb className="h-4 w-4" /> {lang === "en" ? "Tips" : "Suggerimenti"}
+              </NavLink>
+            </nav>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {/* Admin view toggle */}
           {user && isAdmin && (

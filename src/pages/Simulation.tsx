@@ -90,6 +90,24 @@ const Simulation = () => {
   const [error, setError] = useState<string | null>(null);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
 
+  // Per-question timing: track when each eaa_id was first seen + cumulative ms spent
+  const seenAtRef = useRef<Record<string, number>>({});
+  const cumMsRef = useRef<Record<string, number>>({});
+  const activeViewStartRef = useRef<number | null>(null);
+  const activeEaaIdRef = useRef<string | null>(null);
+
+  // Flush time spent on the currently-viewed question to the in-memory accumulator
+  const flushActiveTime = useCallback(() => {
+    const eaaId = activeEaaIdRef.current;
+    const start = activeViewStartRef.current;
+    if (eaaId && start) {
+      const delta = Date.now() - start;
+      cumMsRef.current[eaaId] = (cumMsRef.current[eaaId] ?? 0) + delta;
+    }
+    activeViewStartRef.current = null;
+    activeEaaIdRef.current = null;
+  }, []);
+
   // Auto-pick the first available set when the list loads
   useEffect(() => {
     if (availableSets.length > 0 && !availableSets.includes(selectedSet)) {
@@ -124,7 +142,18 @@ const Simulation = () => {
     setQuestions((prev) =>
       prev.map((q) => (q.eaa_id === eaaId ? { ...q, student_answer: letter } : q))
     );
-    await (supabase as any).from("exam_attempt_answers").update({ student_answer: letter }).eq("id", eaaId);
+    // Flush current time so the answer captures the time spent up to this moment
+    if (activeEaaIdRef.current === eaaId && activeViewStartRef.current) {
+      const delta = Date.now() - activeViewStartRef.current;
+      cumMsRef.current[eaaId] = (cumMsRef.current[eaaId] ?? 0) + delta;
+      activeViewStartRef.current = Date.now();
+    }
+    const update: Record<string, unknown> = {
+      student_answer: letter,
+      time_spent_ms: cumMsRef.current[eaaId] ?? 0,
+      answered_at: letter ? new Date().toISOString() : null,
+    };
+    await (supabase as any).from("exam_attempt_answers").update(update).eq("id", eaaId);
   }, []);
 
   // Arrow key + number key navigation (within current section only)
@@ -274,6 +303,70 @@ const Simulation = () => {
       return next;
     });
   };
+
+  // Track per-question time: start a stopwatch when a question is shown,
+  // accumulate to cumMsRef when the user navigates away or unmounts.
+  // Also stamp first_seen_at on the very first view of each question.
+  useEffect(() => {
+    if (!lang) return;
+    const q = questions[currentIdx];
+    if (!q?.eaa_id) return;
+    const eaaId = q.eaa_id;
+
+    // Flush previous question's time
+    flushActiveTime();
+
+    // Start tracking the new one
+    activeEaaIdRef.current = eaaId;
+    activeViewStartRef.current = Date.now();
+
+    if (!seenAtRef.current[eaaId]) {
+      const ts = Date.now();
+      seenAtRef.current[eaaId] = ts;
+      // Fire-and-forget; ignore errors (RLS/network)
+      (supabase as any)
+        .from("exam_attempt_answers")
+        .update({ first_seen_at: new Date(ts).toISOString() })
+        .eq("id", eaaId)
+        .then(() => {});
+    }
+
+    // Periodically persist time_spent_ms (every 10s) so unexpected close still captures most of it
+    const persistInterval = setInterval(() => {
+      if (activeEaaIdRef.current === eaaId && activeViewStartRef.current) {
+        const cum = (cumMsRef.current[eaaId] ?? 0) + (Date.now() - activeViewStartRef.current);
+        (supabase as any)
+          .from("exam_attempt_answers")
+          .update({ time_spent_ms: cum })
+          .eq("id", eaaId)
+          .then(() => {});
+      }
+    }, 10000);
+
+    return () => {
+      clearInterval(persistInterval);
+      flushActiveTime();
+      const cum = cumMsRef.current[eaaId] ?? 0;
+      if (cum > 0) {
+        (supabase as any)
+          .from("exam_attempt_answers")
+          .update({ time_spent_ms: cum })
+          .eq("id", eaaId)
+          .then(() => {});
+      }
+    };
+  }, [currentIdx, questions, lang, flushActiveTime]);
+
+  // Flush on unmount / page hide
+  useEffect(() => {
+    const onHide = () => flushActiveTime();
+    window.addEventListener("beforeunload", onHide);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.removeEventListener("beforeunload", onHide);
+      document.removeEventListener("visibilitychange", onHide);
+    };
+  }, [flushActiveTime]);
 
   // Language + Set selection screen
   if (!lang) {
