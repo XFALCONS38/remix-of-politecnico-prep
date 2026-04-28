@@ -32,14 +32,30 @@ serve(async (req) => {
     if (!userData?.user) throw new Error("Unauthorized");
 
     // Get attempt
-    const { data: attempt } = await supabase
+    const { data: attempt, error: attemptErr } = await supabase
       .from("attempts")
       .select("id, user_id, score, section_scores, status, submitted_at, is_free_attempt, lang, set_id")
       .eq("id", attempt_id)
-      .single();
+      .maybeSingle();
 
-    if (!attempt) throw new Error("Attempt not found");
-    if (attempt.user_id !== userData.user.id) throw new Error("Unauthorized");
+    if (attemptErr) {
+      return new Response(JSON.stringify({ error: `DB error: ${attemptErr.message}` }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      });
+    }
+    if (!attempt) {
+      return new Response(JSON.stringify({ error: "Attempt not found", attempt_id }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 404,
+      });
+    }
+    if (attempt.user_id !== userData.user.id) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 403,
+      });
+    }
 
     // Get exam_attempt_answers
     const { data: eaas } = await supabase
