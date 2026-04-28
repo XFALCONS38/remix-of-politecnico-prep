@@ -59,6 +59,7 @@ const Results = () => {
   const [questions, setQuestions] = useState<ReviewQuestion[]>([]);
   const [hasPaidAccess, setHasPaidAccess] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   // Content lang is locked to what was used during the exam
   const [contentLang, setContentLang] = useState<Lang>("en");
 
@@ -68,7 +69,11 @@ const Results = () => {
       const { data, error } = await supabase.functions.invoke("get-exam-review", {
         body: { attempt_id: attemptId },
       });
-      if (error || data?.error) { setLoading(false); return; }
+      if (error || data?.error) {
+        setErrorMsg(data?.error || error?.message || "Unable to load attempt");
+        setLoading(false);
+        return;
+      }
       setAttempt(data.attempt);
       setQuestions(data.questions);
       setHasPaidAccess(data.has_paid_access);
@@ -91,7 +96,16 @@ const Results = () => {
   const cLang = contentLang; // for question/option/solution text
 
   if (loading) return <div className="flex min-h-screen items-center justify-center">{lang === "it" ? "Caricamento risultati..." : "Loading results..."}</div>;
-  if (!attempt) return <div className="flex min-h-screen items-center justify-center">{lang === "it" ? "Tentativo non trovato" : "Attempt not found"}</div>;
+  if (!attempt) return (
+    <div className="min-h-screen bg-background">
+      <SiteHeader showDashboard />
+      <main className="container py-20 text-center">
+        <h1 className="text-2xl font-bold mb-2">{lang === "it" ? "Tentativo non trovato" : "Attempt not found"}</h1>
+        <p className="text-muted-foreground mb-6">{errorMsg}</p>
+        <Link to="/dashboard"><Button>Dashboard</Button></Link>
+      </main>
+    </div>
+  );
 
   const score = attempt.score ?? 0;
   const getVerdict = () => {
