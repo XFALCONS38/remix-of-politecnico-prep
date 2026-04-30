@@ -19,8 +19,12 @@ const MathText = ({ text, className }: MathTextProps) => {
     // Split on $$...$$ (block) and $...$ (inline)
     // We process block first to avoid conflicts
     const parts: { type: "text" | "inline" | "block"; content: string }[] = [];
-    // Regex: $$...$$  or  $...$  (non-greedy, no nested $)
-    const regex = /\$\$([\s\S]+?)\$\$|\$([^$\n]+?)\$/g;
+    // Supported delimiters (in order):
+    //   $$...$$        block
+    //   \[...\]        block
+    //   \(...\)        inline
+    //   $...$          inline (allows newlines; non-greedy, no nested $)
+    const regex = /\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|\$([^$]+?)\$/g;
     let lastIndex = 0;
     let match: RegExpExecArray | null;
 
@@ -31,7 +35,11 @@ const MathText = ({ text, className }: MathTextProps) => {
       if (match[1] !== undefined) {
         parts.push({ type: "block", content: match[1] });
       } else if (match[2] !== undefined) {
-        parts.push({ type: "inline", content: match[2] });
+        parts.push({ type: "block", content: match[2] });
+      } else if (match[3] !== undefined) {
+        parts.push({ type: "inline", content: match[3] });
+      } else if (match[4] !== undefined) {
+        parts.push({ type: "inline", content: match[4] });
       }
       lastIndex = regex.lastIndex;
     }
