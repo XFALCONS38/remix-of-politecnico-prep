@@ -463,12 +463,9 @@ export default function AdminQuestions() {
             <p className="text-muted-foreground text-sm">No questions found.</p>
           ) : (
             <Accordion type="multiple" value={openSets} onValueChange={setOpenSets}>
-              {groupedBySet.map(([setId, qs]) => {
-                const page = pageBySet[setId] ?? 0;
-                const totalPages = Math.ceil(qs.length / PAGE_SIZE);
-                const visible = qs.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-                const activeCount = qs.filter(q => q.is_active).length;
-                const setIds = qs.map(q => q.id);
+              {groupedBySet.map(({ setId, sections, allQs }) => {
+                const activeCount = allQs.filter(q => q.is_active).length;
+                const setIds = allQs.map(q => q.id);
                 const allSetSelected = setIds.length > 0 && setIds.every(i => selectedIds.has(i));
                 const someSetSelected = setIds.some(i => selectedIds.has(i));
                 return (
@@ -483,67 +480,100 @@ export default function AdminQuestions() {
                           <Checkbox checked={allSetSelected ? true : someSetSelected ? "indeterminate" as any : false} />
                         </span>
                         <span className="font-medium">{setId}</span>
-                        <Badge variant="secondary" className="text-xs">{qs.length} questions</Badge>
+                        <Badge variant="secondary" className="text-xs">{allQs.length} questions</Badge>
                         <Badge variant="outline" className="text-xs">{activeCount} active</Badge>
+                        <Badge variant="outline" className="text-xs">{sections.length} section{sections.length === 1 ? "" : "s"}</Badge>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b text-left text-muted-foreground">
-                              <th className="pb-2 pr-3 w-8"></th>
-                              <th className="pb-2 pr-3">Code</th>
-                              <th className="pb-2 pr-3">Section</th>
-                              <th className="pb-2 pr-3">Topic</th>
-                              <th className="pb-2 pr-3">Diff</th>
-                              <th className="pb-2 pr-3">Rate</th>
-                              <th className="pb-2 pr-3">IT</th>
-                              <th className="pb-2 pr-3">Active</th>
-                              <th className="pb-2 pr-3">Question</th>
-                              <th className="pb-2">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {visible.map((q) => (
-                              <tr key={q.id} className="border-b last:border-0">
-                                <td className="py-2 pr-3">
-                                  <Checkbox checked={selectedIds.has(q.id)} onCheckedChange={() => toggleSelected(q.id)} />
-                                </td>
-                                <td className="py-2 pr-3 font-mono text-xs">{q.question_code}</td>
-                                <td className="py-2 pr-3"><Badge variant="secondary" className="text-xs">{q.section}</Badge></td>
-                                <td className="py-2 pr-3 text-xs">{q.topic}</td>
-                                <td className="py-2 pr-3">
-                                  <Badge variant={q.difficulty === "hard" ? "destructive" : "secondary"} className="text-xs">{q.difficulty}</Badge>
-                                </td>
-                                <td className="py-2 pr-3 text-xs">{successRate(q)}</td>
-                                <td className="py-2 pr-3">
-                                  <Badge variant={q.it_ready ? "default" : "outline"} className="text-xs">{q.it_ready ? "✓" : "✗"}</Badge>
-                                </td>
-                                <td className="py-2 pr-3">
-                                  <Switch checked={q.is_active} onCheckedChange={() => toggleActive(q.id, q.is_active)} />
-                                </td>
-                                <td className="py-2 pr-3 text-xs max-w-[200px] truncate"><MathText text={q.question_text_en} /></td>
-                                <td className="py-2">
-                                  <div className="flex gap-1">
-                                    <Button variant="ghost" size="sm" onClick={() => editQuestion(q.id)}><Pencil className="h-3.5 w-3.5" /></Button>
-                                    <Button variant="ghost" size="sm" onClick={() => deleteQuestion(q.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                      <Accordion type="multiple" value={openSections} onValueChange={setOpenSections}>
+                        {sections.map(([section, qs]) => {
+                          const key = `${setId}::${section}`;
+                          const page = pageBySetSection[key] ?? 0;
+                          const totalPages = Math.ceil(qs.length / PAGE_SIZE);
+                          const visible = qs.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+                          const sectionActive = qs.filter(q => q.is_active).length;
+                          const sectionIds = qs.map(q => q.id);
+                          const allSectionSelected = sectionIds.length > 0 && sectionIds.every(i => selectedIds.has(i));
+                          const someSectionSelected = sectionIds.some(i => selectedIds.has(i));
+                          return (
+                            <AccordionItem key={key} value={key}>
+                              <AccordionTrigger>
+                                <div className="flex items-center gap-3 text-sm">
+                                  <span
+                                    onClick={(e) => { e.stopPropagation(); toggleSelectSet(sectionIds, allSectionSelected); }}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    className="flex items-center"
+                                  >
+                                    <Checkbox checked={allSectionSelected ? true : someSectionSelected ? "indeterminate" as any : false} />
+                                  </span>
+                                  <span className="font-medium capitalize">{section}</span>
+                                  <Badge variant="secondary" className="text-xs">{qs.length} questions</Badge>
+                                  <Badge variant="outline" className="text-xs">{sectionActive} active</Badge>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                <div className="overflow-x-auto">
+                                  <table className="w-full text-sm">
+                                    <thead>
+                                      <tr className="border-b text-left text-muted-foreground">
+                                        <th className="pb-2 pr-3 w-8"></th>
+                                        <th className="pb-2 pr-3 w-10">#</th>
+                                        <th className="pb-2 pr-3">Code</th>
+                                        <th className="pb-2 pr-3">Topic</th>
+                                        <th className="pb-2 pr-3">Diff</th>
+                                        <th className="pb-2 pr-3">Rate</th>
+                                        <th className="pb-2 pr-3">IT</th>
+                                        <th className="pb-2 pr-3">Active</th>
+                                        <th className="pb-2 pr-3">Question</th>
+                                        <th className="pb-2">Actions</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {visible.map((q, idx) => (
+                                        <tr key={q.id} className="border-b last:border-0">
+                                          <td className="py-2 pr-3">
+                                            <Checkbox checked={selectedIds.has(q.id)} onCheckedChange={() => toggleSelected(q.id)} />
+                                          </td>
+                                          <td className="py-2 pr-3 text-xs text-muted-foreground tabular-nums">{page * PAGE_SIZE + idx + 1}</td>
+                                          <td className="py-2 pr-3 font-mono text-xs">{q.question_code}</td>
+                                          <td className="py-2 pr-3 text-xs">{q.topic}</td>
+                                          <td className="py-2 pr-3">
+                                            <Badge variant={q.difficulty === "hard" ? "destructive" : "secondary"} className="text-xs">{q.difficulty}</Badge>
+                                          </td>
+                                          <td className="py-2 pr-3 text-xs">{successRate(q)}</td>
+                                          <td className="py-2 pr-3">
+                                            <Badge variant={q.it_ready ? "default" : "outline"} className="text-xs">{q.it_ready ? "✓" : "✗"}</Badge>
+                                          </td>
+                                          <td className="py-2 pr-3">
+                                            <Switch checked={q.is_active} onCheckedChange={() => toggleActive(q.id, q.is_active)} />
+                                          </td>
+                                          <td className="py-2 pr-3 text-xs max-w-[200px] truncate"><MathText text={q.question_text_en} /></td>
+                                          <td className="py-2">
+                                            <div className="flex gap-1">
+                                              <Button variant="ghost" size="sm" onClick={() => editQuestion(q.id)}><Pencil className="h-3.5 w-3.5" /></Button>
+                                              <Button variant="ghost" size="sm" onClick={() => deleteQuestion(q.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                                {totalPages > 1 && (
+                                  <div className="mt-3 flex items-center justify-between text-xs">
+                                    <span className="text-muted-foreground">Page {page + 1} of {totalPages}</span>
+                                    <div className="flex gap-1">
+                                      <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPageBySetSection(p => ({ ...p, [key]: page - 1 }))}>Prev</Button>
+                                      <Button size="sm" variant="outline" disabled={page >= totalPages - 1} onClick={() => setPageBySetSection(p => ({ ...p, [key]: page + 1 }))}>Next</Button>
+                                    </div>
                                   </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      {totalPages > 1 && (
-                        <div className="mt-3 flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">Page {page + 1} of {totalPages}</span>
-                          <div className="flex gap-1">
-                            <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPageBySet(p => ({ ...p, [setId]: page - 1 }))}>Prev</Button>
-                            <Button size="sm" variant="outline" disabled={page >= totalPages - 1} onClick={() => setPageBySet(p => ({ ...p, [setId]: page + 1 }))}>Next</Button>
-                          </div>
-                        </div>
-                      )}
+                                )}
+                              </AccordionContent>
+                            </AccordionItem>
+                          );
+                        })}
+                      </Accordion>
                     </AccordionContent>
                   </AccordionItem>
                 );
