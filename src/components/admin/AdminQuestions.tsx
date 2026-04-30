@@ -34,6 +34,7 @@ interface AdminQuestion {
 }
 
 const SECTIONS = ["mathematics", "logic", "physics", "technical"];
+const SECTION_ORDER = ["mathematics", "physics", "logic", "technical"];
 const DIFFICULTIES = ["easy", "medium", "hard"];
 const PAGE_SIZE = 20;
 
@@ -54,7 +55,8 @@ export default function AdminQuestions() {
   const [pdfSetId, setPdfSetId] = useState("SET_01");
   const [pdfSection, setPdfSection] = useState("mathematics");
   const [openSets, setOpenSets] = useState<string[]>([]);
-  const [pageBySet, setPageBySet] = useState<Record<string, number>>({});
+  const [openSections, setOpenSections] = useState<string[]>([]);
+  const [pageBySetSection, setPageBySetSection] = useState<Record<string, number>>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
@@ -77,15 +79,39 @@ export default function AdminQuestions() {
 
   useEffect(() => { loadQuestions(); }, [loadQuestions]);
 
-  // Group questions by set
+  // Group questions by set, then by section, sorted serially within each section
   const groupedBySet = useMemo(() => {
-    const map = new Map<string, AdminQuestion[]>();
+    const setMap = new Map<string, Map<string, AdminQuestion[]>>();
     for (const q of questions) {
-      const arr = map.get(q.set_id) ?? [];
+      let sectionMap = setMap.get(q.set_id);
+      if (!sectionMap) {
+        sectionMap = new Map();
+        setMap.set(q.set_id, sectionMap);
+      }
+      const arr = sectionMap.get(q.section) ?? [];
       arr.push(q);
-      map.set(q.set_id, arr);
+      sectionMap.set(q.section, arr);
     }
-    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+    const cmp = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+    return Array.from(setMap.entries())
+      .sort(([a], [b]) => cmp(a, b))
+      .map(([setId, sectionMap]) => {
+        const sections = Array.from(sectionMap.entries())
+          .sort(([a], [b]) => {
+            const ai = SECTION_ORDER.indexOf(a);
+            const bi = SECTION_ORDER.indexOf(b);
+            if (ai === -1 && bi === -1) return cmp(a, b);
+            if (ai === -1) return 1;
+            if (bi === -1) return -1;
+            return ai - bi;
+          })
+          .map(([section, qs]) => [
+            section,
+            [...qs].sort((x, y) => cmp(x.question_code, y.question_code)),
+          ] as [string, AdminQuestion[]]);
+        const allQs = sections.flatMap(([, qs]) => qs);
+        return { setId, sections, allQs };
+      });
   }, [questions]);
 
   const toggleActive = async (id: string, current: boolean) => {
